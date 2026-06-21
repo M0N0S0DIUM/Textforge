@@ -39,6 +39,13 @@ const {
 const { rateLimiterMiddleware, getStats: getRateStats, startCleanup } = require('./rateLimiter');
 const { initRedis, get: cacheGet, set: cacheSet, clear: cacheClear, generateCacheKey, getStats: getCacheStats } = require('./cache');
 
+// Routes
+const authRouter = require('./routes/auth');
+const keysRouter = require('./routes/keys');
+const billingRouter = require('./routes/billing');
+const usersRouter = require('./routes/users');
+const stripeRouter = require('./routes/stripe');
+
 // Initialize Express app
 const app = express();
 
@@ -813,6 +820,19 @@ app.post('/batch', async (req, res) => {
 // ============================================
 // Error Handling
 // ============================================
+
+// ============================================
+// API Routes
+// ============================================
+
+// Stripe webhook must be before JSON body parser (uses raw body)
+app.use('/api', stripeRouter);
+
+// Auth, keys, billing, user routes
+app.use('/auth', authRouter);
+app.use('/api/keys', keysRouter);
+app.use('/billing', billingRouter);
+app.use('/users', usersRouter);
 
 // 404 handler
 app.use((req, res) => {
