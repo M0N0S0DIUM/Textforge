@@ -373,10 +373,8 @@ function random(length, type = 'alnum') {
   }
   
   let result = '';
-  // Use crypto random for better randomness
-  const array = crypto.randomBytes(n);
   for (let i = 0; i < n; i++) {
-    result += chars[array[i] % chars.length];
+    result += chars[crypto.randomInt(chars.length)];
   }
   return result;
 }

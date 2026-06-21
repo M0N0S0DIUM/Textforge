@@ -141,6 +141,9 @@ export default function Docs() {
             <p className="text-gray-600 mb-8">
               TextForge uses API keys for authentication. Include your key in the <code>X-API-Key</code> header.
             </p>
+            <p className="text-gray-600 mb-4">
+              Pro keys use the format <code>tf_pro_&lt;32 lowercase hex chars&gt;</code>.
+            </p>
 
             <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">Getting Your Key</h2>
             <p className="text-gray-600 mb-4">
@@ -149,7 +152,7 @@ export default function Docs() {
 
             <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">Usage</h2>
             <div className="code-block mb-8">
-              <pre className="text-gray-300">{`curl -H "X-API-Key: your-api-key" \\
+              <pre className="text-gray-300">{`curl -H "X-API-Key: tf_pro_0123456789abcdef0123456789abcdef" \\
   "https://api.textforge.co/transform?text=Hello&action=slugify"`}</pre>
             </div>
           </div>
@@ -186,6 +189,9 @@ export default function Docs() {
               <pre className="text-gray-300">{`X-RateLimit-Limit: 1000
 X-RateLimit-Remaining: 999`}</pre>
             </div>
+            <p className="text-gray-600 mb-4">
+              Redis-backed deployments share rate limits across instances. Without Redis, rate limits fall back to in-memory counters for single-instance use only.
+            </p>
           </div>
         )}
 

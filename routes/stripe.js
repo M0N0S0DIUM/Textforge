@@ -1,8 +1,8 @@
 const express = require('express');
 const Stripe = require('stripe');
-const crypto = require('crypto');
 const db = require('../db');
 const logger = require('../logger');
+const { generateApiKey, hashApiKey } = require('../apiKeys');
 
 const router = express.Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -12,12 +12,6 @@ const TIER_PRICE_MAP = {
   pro: process.env.STRIPE_PRO_PRICE_ID || process.env.STRIPE_PRICE_ID,
   enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID,
 };
-
-// Generate a random API key with tf_pro_ prefix
-function generateApiKey() {
-  const randomPart = crypto.randomBytes(16).toString('hex');
-  return `tf_pro_${randomPart}`;
-}
 
 // ──────────────────────────────────────────────
 // Checkout
@@ -326,6 +320,7 @@ async function dispatchEvent(event) {
       const tier = session.metadata?.tier || 'pro';
 
       const apiKey = generateApiKey();
+      const apiKeyHash = hashApiKey(apiKey);
 
       const existing = db
         .prepare('SELECT * FROM customers WHERE stripe_customer_id = ?')
@@ -341,8 +336,9 @@ async function dispatchEvent(event) {
         ).run(session.customer, email, tier, session.subscription, 'active');
       }
 
-      db.prepare('INSERT INTO api_keys (key, customer_id, tier) VALUES (?, ?, ?)').run(
+      db.prepare('INSERT INTO api_keys (key, key_hash, customer_id, tier) VALUES (?, ?, ?, ?)').run(
         apiKey,
+        apiKeyHash,
         session.customer,
         tier
       );

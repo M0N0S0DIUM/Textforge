@@ -10,9 +10,10 @@
  * Falls back to per-IP rate limiting when no API key is provided.
  */
 
-const crypto = require('crypto');
 const db = require('./db');
 const logger = require('./logger');
+const crypto = require('crypto');
+const { API_KEY_PREFIX, hashApiKey, isApiKeyFormatValid } = require('./apiKeys');
 
 // Rate limit constants
 const FREE_TIER_LIMIT = 1000;
@@ -20,18 +21,17 @@ const PRO_TIER_LIMIT = 50000;
 const DAY_IN_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 const CLEANUP_INTERVAL = 60 * 60 * 1000; // Clean up every hour
 
-// In-memory storage for rate limit counters
 const rateLimitStore = new Map();
-
-// API key prefix for validation
-const API_KEY_PREFIX = 'tf_';
+let redisClient = null;
+let redisAvailable = false;
+let warnedInMemoryFallback = false;
 
 /**
  * Get or create a rate limit entry for a given key
  * @param {string} key - Unique identifier (API key or IP)
  * @returns {object} Rate limit entry with count and reset time
  */
-function getRateLimitEntry(key) {
+function getMemoryRateLimitEntry(key) {
   const now = Date.now();
   let entry = rateLimitStore.get(key);
   
@@ -47,39 +47,139 @@ function getRateLimitEntry(key) {
   return entry;
 }
 
+function logInMemoryFallback(context) {
+  if (warnedInMemoryFallback) {
+    return;
+  }
+  warnedInMemoryFallback = true;
+  logger.warn('Using in-memory rate limiting fallback; limits are not shared across instances', context || {});
+}
+
 /**
- * Hash an API key for secure storage/comparison
- * @param {string} apiKey - API key to hash
- * @returns {string} HMAC-SHA256 hash
+ * Initialize Redis-backed rate limiting if REDIS_URL is configured
+ * @returns {Promise<boolean>} Whether Redis-backed rate limiting is available
  */
-function hashApiKey(apiKey) {
-  const secret = process.env.API_KEY_SECRET || 'default-secret-change-in-production';
-  return crypto.createHmac('sha256', secret).update(apiKey).digest('hex');
+async function initRateLimiter() {
+  const url = process.env.REDIS_URL;
+
+  if (!url) {
+    redisAvailable = false;
+    redisClient = null;
+    logInMemoryFallback({ reason: 'REDIS_URL is not configured' });
+    return false;
+  }
+
+  try {
+    const redis = await import('redis');
+    redisClient = redis.createClient({ url });
+
+    redisClient.on('error', (err) => {
+      redisAvailable = false;
+      redisClient = null;
+      logger.warn('Redis rate limiter error; falling back to in-memory mode', { error: err.message });
+      logInMemoryFallback({ reason: 'Redis connection error' });
+    });
+
+    await redisClient.connect();
+    redisAvailable = true;
+    warnedInMemoryFallback = false;
+    logger.info('Redis rate limiter initialized successfully');
+    return true;
+  } catch (err) {
+    redisAvailable = false;
+    redisClient = null;
+    logger.warn('Redis rate limiter initialization failed; falling back to in-memory mode', {
+      error: err.message
+    });
+    logInMemoryFallback({ reason: 'Redis initialization failed' });
+    return false;
+  }
+}
+
+function getRedisRateLimitKey(identifier) {
+  const identifierHash = crypto.createHash('sha256').update(identifier).digest('hex');
+  return `tf:rate_limit:${identifierHash}`;
+}
+
+function incrementMemoryRateLimit(key) {
+  const entry = getMemoryRateLimitEntry(key);
+  entry.count++;
+  return entry;
+}
+
+async function incrementRedisRateLimit(identifier) {
+  const key = getRedisRateLimitKey(identifier);
+  const count = await redisClient.incr(key);
+  let ttlMs = await redisClient.pTTL(key);
+
+  if (ttlMs < 0) {
+    await redisClient.pExpire(key, DAY_IN_MS);
+    ttlMs = DAY_IN_MS;
+  }
+
+  return {
+    count,
+    resetAt: Date.now() + ttlMs
+  };
+}
+
+async function incrementRateLimit(identifier) {
+  if (redisAvailable && redisClient) {
+    try {
+      return await incrementRedisRateLimit(identifier);
+    } catch (err) {
+      redisAvailable = false;
+      redisClient = null;
+      logger.warn('Redis rate limiter request failed; using in-memory mode', { error: err.message });
+      logInMemoryFallback({ reason: 'Redis request failed' });
+    }
+  }
+
+  return incrementMemoryRateLimit(identifier);
+}
+
+function safeEqualHex(left, right) {
+  const leftBuffer = Buffer.from(left, 'hex');
+  const rightBuffer = Buffer.from(right, 'hex');
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
 
 /**
  * Check if an API key is valid and get its tier
  * @param {string} apiKey - API key to validate
- * @returns {Promise<{ valid: boolean, tier: string }>}
+ * @returns {Promise<{ valid: boolean, tier: string, keyHash?: string }>}
  */
 async function validateApiKey(apiKey) {
-  // Basic format check
-  if (!apiKey || typeof apiKey !== 'string' || !apiKey.startsWith(API_KEY_PREFIX)) {
+  if (!isApiKeyFormatValid(apiKey)) {
     return { valid: false, tier: 'free' };
   }
   
   try {
-    // Query database for the API key
-    const keyRecord = db.prepare('SELECT * FROM api_keys WHERE key = ?').get(apiKey);
+    const apiKeyHash = hashApiKey(apiKey);
+    let keyRecord = db.prepare('SELECT * FROM api_keys WHERE key_hash = ?').get(apiKeyHash);
+
+    if (!keyRecord) {
+      keyRecord = db.prepare('SELECT * FROM api_keys WHERE key = ?').get(apiKey);
+      if (keyRecord) {
+        db.prepare('UPDATE api_keys SET key_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(
+          apiKeyHash,
+          keyRecord.id
+        );
+        keyRecord.key_hash = apiKeyHash;
+      }
+    }
     
     if (!keyRecord) {
       logger.warn('Invalid API key attempted', { keyPrefix: apiKey.substring(0, 10) });
       return { valid: false, tier: 'free' };
     }
-    
-    // Verify key is active (optional: check expiration, status, etc.)
-    // For now, any key in the database is valid
-    return { valid: true, tier: keyRecord.tier || 'free' };
+
+    if (keyRecord.key_hash && !safeEqualHex(apiKeyHash, keyRecord.key_hash)) {
+      logger.warn('API key hash mismatch detected', { keyId: keyRecord.id });
+      return { valid: false, tier: 'free' };
+    }
+
+    return { valid: true, tier: keyRecord.tier || 'free', keyHash: apiKeyHash };
   } catch (err) {
     logger.error('Error validating API key', err);
     return { valid: false, tier: 'free' };
@@ -93,28 +193,20 @@ async function validateApiKey(apiKey) {
  * @returns {Promise<object>} Rate limit status with headers
  */
 async function checkRateLimit(apiKey, ip) {
-  // Determine the identifier to use
-  const identifier = apiKey || ip || 'anonymous';
-  
-  // Validate API key if provided
+  let identifier = ip || 'anonymous';
   let tier = 'free';
+
   if (apiKey) {
     const validation = await validateApiKey(apiKey);
     if (validation.valid) {
       tier = validation.tier;
+      identifier = `api:${validation.keyHash}`;
     }
   }
   
-  // Determine the limit based on tier
   const limit = tier === 'pro' ? PRO_TIER_LIMIT : FREE_TIER_LIMIT;
+  const entry = await incrementRateLimit(identifier);
   
-  // Get or create rate limit entry
-  const entry = getRateLimitEntry(identifier);
-  
-  // Increment counter
-  entry.count++;
-  
-  // Calculate retry-after in seconds
   const retryAfter = Math.ceil((entry.resetAt - Date.now()) / 1000);
   
   return {
@@ -190,7 +282,10 @@ function cleanupRateLimitStore() {
  * Start automatic cleanup interval
  */
 function startCleanup() {
-  setInterval(cleanupRateLimitStore, CLEANUP_INTERVAL);
+  const interval = setInterval(cleanupRateLimitStore, CLEANUP_INTERVAL);
+  if (typeof interval.unref === 'function') {
+    interval.unref();
+  }
 }
 
 /**
@@ -206,14 +301,14 @@ function getStats() {
       activeEntries.push({
         key,
         count: entry.count,
-        limit: (key.startsWith(API_KEY_PREFIX)) ? PRO_TIER_LIMIT : FREE_TIER_LIMIT,
-        remaining: Math.max(0, (key.startsWith(API_KEY_PREFIX)) ? PRO_TIER_LIMIT : FREE_TIER_LIMIT - entry.count),
         resetAt: entry.resetAt
       });
     }
   }
   
   return {
+    backend: redisAvailable ? 'redis' : 'memory',
+    redisAvailable,
     totalEntries: activeEntries.length,
     entries: activeEntries
   };
@@ -223,11 +318,25 @@ function getStats() {
  * Reset rate limit for a specific key (useful for testing)
  * @param {string} key - Key to reset
  */
-function resetRateLimit(key) {
+async function resetRateLimit(key) {
+  const normalizedKey = isApiKeyFormatValid(key) ? `api:${hashApiKey(key)}` : key;
   rateLimitStore.delete(key);
+  rateLimitStore.delete(normalizedKey);
+  if (redisAvailable && redisClient) {
+    try {
+      await redisClient.del(getRedisRateLimitKey(key));
+      if (normalizedKey !== key) {
+        await redisClient.del(getRedisRateLimitKey(normalizedKey));
+      }
+    } catch (err) {
+      logger.warn('Failed to reset Redis rate limit entry', { error: err.message });
+    }
+  }
 }
 
 module.exports = {
+  API_KEY_PREFIX,
+  initRateLimiter,
   rateLimiterMiddleware,
   checkRateLimit,
   validateApiKey,

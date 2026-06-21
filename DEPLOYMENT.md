@@ -25,7 +25,7 @@ This guide walks you through deploying TextForge on [Railway](https://railway.ap
 1. Inside your Railway project click **+ New** → **Database** → **Add Redis**.
 2. Railway will inject the `REDIS_URL` environment variable automatically.
 
-> **Note:** If you skip Redis, TextForge falls back to an in-memory LRU cache – this is fine for single-instance deployments.
+> **Note:** If you skip Redis, TextForge falls back to in-memory cache and in-memory rate limiting. That is only appropriate for local development or single-instance deployments because limits are not shared between replicas.
 
 ---
 
@@ -38,12 +38,15 @@ In the Railway dashboard open your service → **Variables** tab and add:
 | `NODE_ENV` | `production` | Enables production optimisations |
 | `PORT` | `3000` | (Railway usually sets this automatically) |
 | `BASE_URL` | `https://your-app.up.railway.app` | Public URL used in Stripe redirect URLs |
+| `API_KEY_SECRET` | `32+ random bytes` | **Required.** HMAC secret for API key hashing/validation |
 | `STRIPE_SECRET_KEY` | `sk_live_...` | Stripe live secret key |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_...` | From the Stripe webhook endpoint |
 | `STRIPE_PRO_PRICE_ID` | `price_...` | Pro plan price ID |
 | `STRIPE_ENTERPRISE_PRICE_ID` | `price_...` | Enterprise plan price ID |
 
 Copy `.env.example` as a reference for all available variables.
+
+> **Production recommendation:** keep Redis enabled for shared rate limiting, and consider PostgreSQL instead of SQLite if you expect sustained concurrent writes.
 
 ---
 
