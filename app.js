@@ -282,22 +282,38 @@ async function sendWebhook(webhookUrl, data) {
   }
 }
 
+// Stripe / billing routes (must be mounted before the global JSON parser affects raw bodies)
+const stripeRouter = require('./routes/stripe');
+app.use('/api', stripeRouter);
+
 // ============================================
 // Routes
 // ============================================
 
 /**
  * GET /health - Health check endpoint
- * Returns API status and uptime
+ * Returns API status, database status, and uptime
  */
 app.get('/health', (req, res) => {
   const uptime = Math.floor((Date.now() - stats.startTime) / 1000);
   const cacheStats = getCacheStats();
-  
-  res.json({
-    success: true,
-    status: 'healthy',
+
+  // Quick database liveness probe
+  let dbStatus = 'healthy';
+  try {
+    db.prepare('SELECT 1').get();
+  } catch (err) {
+    dbStatus = 'unhealthy';
+    logger.error('Database health check failed', { error: err.message });
+  }
+
+  const status = dbStatus === 'healthy' ? 'healthy' : 'degraded';
+
+  res.status(status === 'healthy' ? 200 : 503).json({
+    success: status === 'healthy',
+    status,
     uptime_seconds: uptime,
+    database: dbStatus,
     cache: cacheStats,
     version: '1.0.0'
   });

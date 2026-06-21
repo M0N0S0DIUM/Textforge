@@ -31,8 +31,39 @@ db.exec(`
     stripe_customer_id TEXT UNIQUE NOT NULL,
     email TEXT,
     tier TEXT DEFAULT 'free',
+    subscription_id TEXT,
+    subscription_status TEXT DEFAULT 'inactive',
+    current_period_end DATETIME,
+    cancel_at_period_end INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS invoices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    stripe_invoice_id TEXT UNIQUE NOT NULL,
+    stripe_customer_id TEXT NOT NULL,
+    amount_paid INTEGER DEFAULT 0,
+    amount_due INTEGER DEFAULT 0,
+    currency TEXT DEFAULT 'usd',
+    status TEXT DEFAULT 'draft',
+    invoice_pdf TEXT,
+    hosted_invoice_url TEXT,
+    period_start DATETIME,
+    period_end DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS payment_methods (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    stripe_customer_id TEXT NOT NULL,
+    stripe_payment_method_id TEXT UNIQUE NOT NULL,
+    brand TEXT,
+    last4 TEXT,
+    exp_month INTEGER,
+    exp_year INTEGER,
+    is_default INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
 
