@@ -21,10 +21,10 @@
  *   - REDIS_URL (optional, for Redis caching)
  */
 
-const stripeRoutes = require('./routes/stripe');
-const db = require('./db');
 const express = require('express');
 const path = require('path');
+const db = require('./db');
+const logger = require('./logger');
 
 // Import modules
 const {
@@ -70,18 +70,8 @@ app.use((req, res, next) => {
   res.set('Access-Control-Allow-Headers', 'Content-Type, X-API-Key');
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
-// Stripe webhook route (must be before JSON parser)
-app.post('/api/webhook', express.raw({ type: 'application/json' }), stripeRoutes);
-
-// Stripe API routes
-app.use('/api', stripeRoutes);
   }
   next();
-// API Keys endpoint
-app.get('/api/keys', (req, res) => {
-  const keys = db.prepare('SELECT * FROM api_keys ORDER BY created_at DESC').all();
-  res.json({ success: true, keys });
-});
 });
 
 // JSON body parser with size limit
@@ -98,7 +88,11 @@ app.use((req, res, next) => {
     const method = req.method;
     const url = req.originalUrl;
     const status = res.statusCode;
-    // Silent logging - no console.log in production
+    
+    // Log in development mode
+    if (NODE_ENV === 'development') {
+      logger.debug(`${method} ${url} - ${status} (${duration}ms)`);
+    }
   });
   
   next();
@@ -116,6 +110,41 @@ app.use((req, res, next) => {
 // ============================================
 // Helper Functions
 // ============================================
+
+/**
+ * Validate webhook URL to prevent SSRF attacks
+ * @param {string} url - URL to validate
+ * @returns {boolean} Whether URL is safe
+ */
+function isValidWebhookUrl(url) {
+  try {
+    const parsed = new URL(url);
+    
+    // Reject private IP ranges and localhost
+    const hostname = parsed.hostname;
+    const privatePatterns = [
+      /^localhost$/i,
+      /^127\./,
+      /^10\./,
+      /^172\.(1[6-9]|2[0-9]|3[01])\./,
+      /^192\.168\./,
+      /^::1$/,
+      /^fc00:/i,
+      /^fe80:/i
+    ];
+    
+    for (const pattern of privatePatterns) {
+      if (pattern.test(hostname)) {
+        return false;
+      }
+    }
+    
+    // Only allow http and https
+    return ['http:', 'https:'].includes(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Execute a single transformation with caching and timing
@@ -152,6 +181,7 @@ async function executeTransform(text, action, params = {}) {
       result = transformFn(text);
     }
   } catch (err) {
+    logger.error('Transformation execution failed', { action, error: err.message });
     return { error: `Transformation failed: ${err.message}`, status: 500 };
   }
   
@@ -231,6 +261,12 @@ async function executeAllTransforms(text, params = {}) {
  * @param {object} data - Data to send
  */
 async function sendWebhook(webhookUrl, data) {
+  // Validate webhook URL to prevent SSRF
+  if (!isValidWebhookUrl(webhookUrl)) {
+    logger.warn('Invalid webhook URL rejected', { url: webhookUrl });
+    return;
+  }
+  
   try {
     const response = await fetch(webhookUrl, {
       method: 'POST',
@@ -239,10 +275,10 @@ async function sendWebhook(webhookUrl, data) {
       signal: AbortSignal.timeout(5000) // 5 second timeout
     });
     if (!response.ok) {
-      // Silent failure - don't log
+      logger.warn('Webhook failed with status', { url: webhookUrl, status: response.status });
     }
-  } catch {
-    // Silently ignore webhook failures
+  } catch (err) {
+    logger.warn('Webhook request failed', { url: webhookUrl, error: err.message });
   }
 }
 
@@ -742,6 +778,7 @@ app.post('/batch', async (req, res) => {
           execution_time_ms: result.execution_time_ms
         };
       } catch (err) {
+        logger.error('Batch processing error', { item: item.substring(0, 50), error: err.message });
         return {
           index,
           original: item,
@@ -790,6 +827,8 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   stats.errors++;
   
+  logger.error('Unhandled error', err);
+  
   // Handle JSON parse errors
   if (err.type === 'entity.parse.failed') {
     return res.status(400).json({
@@ -815,10 +854,12 @@ async function startServer() {
   // Initialize Redis cache (non-blocking)
   initRedis().then((available) => {
     if (available) {
-      // Redis connected successfully
+      logger.info('Redis cache initialized successfully');
     } else {
-      // Will use in-memory fallback
+      logger.info('Using in-memory cache fallback');
     }
+  }).catch((err) => {
+    logger.warn('Redis initialization error', { error: err.message });
   });
   
   // Start automatic cleanup for rate limiter
@@ -826,13 +867,14 @@ async function startServer() {
   
   // Start Express server
   app.listen(PORT, () => {
-    // Server started - silent startup
+    logger.info(`TextForge API listening on port ${PORT}`, { env: NODE_ENV });
   });
 }
 
 // Start the server
 startServer().catch((err) => {
-  // Silent error handling
+  logger.error('Failed to start server', err);
+  process.exit(1);
 });
 
 // Export for testing

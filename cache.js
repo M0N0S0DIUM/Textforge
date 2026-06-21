@@ -8,6 +8,7 @@
  * TTL is configurable (default: 1 hour).
  */
 
+const crypto = require('crypto');
 const MAX_CACHE_SIZE = 1000; // Maximum number of entries in in-memory cache
 const DEFAULT_TTL = 3600; // Default TTL in seconds (1 hour)
 
@@ -56,6 +57,7 @@ async function initRedis() {
 
 /**
  * Generate a cache key from transformation parameters
+ * Uses SHA-256 hash to ensure unique keys for different inputs
  * @param {string} text - The input text
  * @param {string} action - The transformation action
  * @param {object} params - Additional parameters
@@ -66,7 +68,11 @@ function generateCacheKey(text, action, params = {}) {
     .sort()
     .map(([k, v]) => `${k}=${v}`)
     .join('&');
-  return `tf:${action}:${Buffer.from(text).length}:${paramStr}`;
+  
+  // Use SHA-256 hash of actual text content, not just length
+  // This prevents cache collisions between different texts
+  const textHash = crypto.createHash('sha256').update(text).digest('hex');
+  return `tf:${action}:${textHash}:${paramStr}`;
 }
 
 /**
