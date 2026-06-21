@@ -1,9 +1,9 @@
 const express = require('express');
 const Stripe = require('stripe');
+const rateLimit = require('express-rate-limit');
 const db = require('../db');
 const logger = require('../logger');
 const { generateApiKey, hashApiKey } = require('../apiKeys');
-const { rateLimiterMiddleware } = require('../rateLimiter');
 
 const router = express.Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -14,12 +14,21 @@ const TIER_PRICE_MAP = {
   enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID,
 };
 
+// Stricter rate limit for key management endpoints to prevent enumeration / abuse.
+const keyManagementLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests to key management endpoint, please try again later.' },
+});
+
 // ──────────────────────────────────────────────
 // API Keys
 // ──────────────────────────────────────────────
 
 // GET /api/keys  — list all API keys
-router.get('/keys', rateLimiterMiddleware(), (req, res) => {
+router.get('/keys', keyManagementLimiter, (req, res) => {
   try {
     const keys = db
       .prepare('SELECT id, key, tier, customer_id, created_at FROM api_keys ORDER BY created_at DESC')
@@ -32,7 +41,7 @@ router.get('/keys', rateLimiterMiddleware(), (req, res) => {
 });
 
 // POST /api/keys  — create a new API key (server-side secure generation)
-router.post('/keys', rateLimiterMiddleware(), (req, res) => {
+router.post('/keys', keyManagementLimiter, (req, res) => {
   try {
     const { customer_id, tier = 'pro' } = req.body || {};
     const apiKey = generateApiKey();
@@ -57,7 +66,7 @@ router.post('/keys', rateLimiterMiddleware(), (req, res) => {
 });
 
 // DELETE /api/keys/:id  — revoke an API key by id
-router.delete('/keys/:id', rateLimiterMiddleware(), (req, res) => {
+router.delete('/keys/:id', keyManagementLimiter, (req, res) => {
   try {
     const { id } = req.params;
     const result = db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
