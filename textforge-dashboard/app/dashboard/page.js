@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Copy, Check, RefreshCw, Trash2 } from 'lucide-react';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+
 export default function Dashboard() {
   const [apiKey, setApiKey] = useState('');
   const [copied, setCopied] = useState(false);
@@ -15,7 +17,7 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('http://localhost:3000/stats');
+        const response = await fetch(`${API_URL}/stats`);
         const data = await response.json();
         if (data.success) {
           setStats(data.stats);
@@ -32,7 +34,7 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchKeys = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/keys');
+        const response = await fetch(`${API_URL}/api/keys`);
         const data = await response.json();
         if (data.success) {
           setKeys(data.keys);
@@ -63,10 +65,14 @@ export default function Dashboard() {
     }
 
     try {
-      // In production, this would call a backend endpoint to generate a new key
-      const newKey = 'tf_pro_' + Math.random().toString(36).substring(2, 34) + Math.random().toString(36).substring(2, 34);
-      setApiKey(newKey);
-      setKeys([{ key: newKey, tier: 'pro', created_at: new Date().toISOString() }]);
+      const response = await fetch(`${API_URL}/api/keys`, { method: 'POST' });
+      const data = await response.json();
+      if (data.success && data.key) {
+        setApiKey(data.key.key);
+        setKeys([data.key]);
+      } else {
+        console.error('Failed to regenerate key:', data.error);
+      }
     } catch (err) {
       console.error('Failed to regenerate key:', err);
     }
@@ -78,7 +84,9 @@ export default function Dashboard() {
     }
 
     try {
-      // In production, this would call a backend endpoint to revoke the key
+      if (keys.length > 0 && keys[0].id) {
+        await fetch(`${API_URL}/api/keys/${keys[0].id}`, { method: 'DELETE' });
+      }
       setApiKey('');
       setKeys([]);
       setPlan('Free');
