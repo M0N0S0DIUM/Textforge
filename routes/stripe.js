@@ -3,6 +3,7 @@ const Stripe = require('stripe');
 const db = require('../db');
 const logger = require('../logger');
 const { generateApiKey, hashApiKey } = require('../apiKeys');
+const { rateLimiterMiddleware } = require('../rateLimiter');
 
 const router = express.Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -18,7 +19,7 @@ const TIER_PRICE_MAP = {
 // ──────────────────────────────────────────────
 
 // GET /api/keys  — list all API keys
-router.get('/keys', (req, res) => {
+router.get('/keys', rateLimiterMiddleware(), (req, res) => {
   try {
     const keys = db
       .prepare('SELECT id, key, tier, customer_id, created_at FROM api_keys ORDER BY created_at DESC')
@@ -31,7 +32,7 @@ router.get('/keys', (req, res) => {
 });
 
 // POST /api/keys  — create a new API key (server-side secure generation)
-router.post('/keys', (req, res) => {
+router.post('/keys', rateLimiterMiddleware(), (req, res) => {
   try {
     const { customer_id, tier = 'pro' } = req.body || {};
     const apiKey = generateApiKey();
@@ -56,7 +57,7 @@ router.post('/keys', (req, res) => {
 });
 
 // DELETE /api/keys/:id  — revoke an API key by id
-router.delete('/keys/:id', (req, res) => {
+router.delete('/keys/:id', rateLimiterMiddleware(), (req, res) => {
   try {
     const { id } = req.params;
     const result = db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);

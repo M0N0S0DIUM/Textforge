@@ -22,7 +22,13 @@ function generateApiKey() {
 }
 
 function hashApiKey(apiKey) {
-  return crypto.createHmac('sha256', API_KEY_SECRET).update(apiKey).digest('hex');
+  // HMAC-SHA256 with a server secret is the industry-standard approach for
+  // high-entropy API token verification. API keys are 128-bit random values
+  // (crypto.randomBytes), so brute-force is computationally infeasible regardless
+  // of hash speed. Slow KDFs (bcrypt/scrypt) are for low-entropy user passwords,
+  // not high-entropy tokens. The server secret prevents offline dictionary attacks.
+  // lgtm[js/insufficient-password-hash]
+  return crypto.createHmac('sha256', API_KEY_SECRET).update(apiKey).digest('hex'); // lgtm[js/insufficient-password-hash]
 }
 
 function isApiKeyFormatValid(apiKey) {
