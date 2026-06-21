@@ -1,0 +1,35 @@
+{
+  "name": "textforge",
+  "version": "1.0.0",
+  "description": "Smart Text Utility API - 23 text transformations in a single endpoint",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js",
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "text",
+    "transform",
+    "api",
+    "utility",
+    "slugify",
+    "camelcase",
+    "morse"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "express": "^4.18.2",
+    "redis": "^4.6.12",
+    "stripe": "^14.9.0"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "npm start",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10,
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 100,
+    "replicas": 1,
+    "startupTime": 60,
+    "envs": [
+      {
+        "key": "NODE_ENV",
+        "value": "production"
+      }
+    ]
+  }
+}

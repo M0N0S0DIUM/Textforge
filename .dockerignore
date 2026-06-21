@@ -1,0 +1,37 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+LICENSE
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Railway
+railway.json
+
+# Docker
+docker-compose.yml
+Dockerfile
+
+# Test files
+test
+*.test.js
+
+# Environment
+.env
+.env.local
