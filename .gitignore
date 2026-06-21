@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+textforge-dashboard/node_modules/
+
+# Database files
+data/
+
+# Environment variables
+.env
+textforge-dashboard/.env.local
+
+# Next.js build output
+textforge-dashboard/.next/
+textforge-dashboard/out/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
