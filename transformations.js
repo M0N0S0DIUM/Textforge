@@ -9,6 +9,8 @@
  * Regex patterns are carefully crafted to avoid catastrophic backtracking.
  */
 
+const crypto = require('crypto');
+
 // Leet speak substitution map
 const LEET_MAP = {
   a: '4', e: '3', i: '1', o: '0', s: '5',
@@ -340,8 +342,6 @@ function base64decode(text) {
  * @returns {string} SHA-256 hex digest
  */
 function hash(text) {
-  // Use Node.js built-in crypto module
-  const crypto = require('crypto');
   return crypto.createHash('sha256').update(text.toString()).digest('hex');
 }
 
@@ -374,7 +374,6 @@ function random(length, type = 'alnum') {
   
   let result = '';
   // Use crypto random for better randomness
-  const crypto = require('crypto');
   const array = crypto.randomBytes(n);
   for (let i = 0; i < n; i++) {
     result += chars[array[i] % chars.length];
