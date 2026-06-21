@@ -26,6 +26,9 @@ cd textforge
 # Install dependencies
 npm install
 
+# Required before starting the API
+export API_KEY_SECRET="$(openssl rand -hex 32)"
+
 # Start the server
 npm start
 
@@ -38,12 +41,15 @@ npm run dev
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | Port to run the server on |
-| `REDIS_URL` | `null` | Redis connection URL (optional, for caching) |
+| `API_KEY_SECRET` | - | **Required.** HMAC secret used to hash and validate API keys |
+| `REDIS_URL` | `null` | Optional Redis connection URL for shared caching and shared rate limiting |
 | `NODE_ENV` | `development` | Environment (development/production) |
 | `STRIPE_SECRET_KEY` | - | Stripe secret key for payment processing |
 | `STRIPE_WEBHOOK_SECRET` | - | Stripe webhook signing secret |
 | `STRIPE_PRICE_ID` | - | Stripe subscription price ID |
 | `BASE_URL` | `http://localhost:3000` | Base URL for redirects |
+
+> **Breaking change:** `API_KEY_SECRET` is now mandatory in every environment. TextForge fails fast on startup if it is missing.
 
 ## Stripe Payment Integration
 
@@ -77,7 +83,7 @@ The dashboard will be available at `http://localhost:3001` (or whatever port Nex
 ### API Key Management
 
 - Pro API keys start with `tf_pro_`
-- Keys are stored in SQLite database (`data/textforge.db`)
+- API keys are validated using an HMAC derived from `API_KEY_SECRET`
 - Webhook automatically generates keys on successful payment
 - Keys can be regenerated or revoked from the dashboard
 
@@ -87,6 +93,8 @@ The dashboard will be available at `http://localhost:3001` (or whatever port Nex
 |------|-------|-------------|
 | Free | 1,000 requests/day | No |
 | Pro | 50,000 requests/day | Yes (`tf_pro_...`) |
+
+Shared rate limiting uses Redis when `REDIS_URL` is configured. If Redis is unset or unavailable, TextForge logs a warning and falls back to per-instance in-memory counters, which are only appropriate for local development or single-instance deployments.
 
 ## API Documentation
 
@@ -311,7 +319,7 @@ curl "http://localhost:3000/transform?text=Hello%20World!&actions=slugify,revers
 | Tier | Limit | How to Access |
 |------|-------|---------------|
 | Free | 1,000 requests/day | No API key needed |
-| Pro | 50,000 requests/day | Send `X-API-Key: tf_pro_your-key` |
+| Pro | 50,000 requests/day | Send `X-API-Key: tf_pro_<32-hex-chars>` |
 
 **Rate Limit Headers:**
 - `X-RateLimit-Limit`: Maximum requests per day
@@ -320,16 +328,20 @@ curl "http://localhost:3000/transform?text=Hello%20World!&actions=slugify,revers
 
 When rate limited, you'll receive a `429 Too Many Requests` response.
 
+- Redis configured: counters are shared across instances.
+- Redis unavailable: counters fall back to in-memory storage with warning logs; limits are not shared across replicas.
+
 ## API Key System
 
 Include an API key in the request header for higher rate limits:
 
 ```bash
-curl -H "X-API-Key: tf_pro_mykey123" http://localhost:3000/transform?text=Hello&action=slugify
+curl -H "X-API-Key: tf_pro_0123456789abcdef0123456789abcdef" http://localhost:3000/transform?text=Hello&action=slugify
 ```
 
 - Free keys (no prefix): 1,000/day
 - Pro keys (prefix `tf_pro_`): 50,000/day
+- Pro keys must match `tf_pro_<32 lowercase hex chars>`
 
 ## Postman / Insomnia Collection
 
@@ -426,7 +438,7 @@ GET {{baseUrl}}/stats
 ### With API Key (Insomnia)
 ```
 Headers:
-  X-API-Key: tf_pro_mykey123
+  X-API-Key: tf_pro_0123456789abcdef0123456789abcdef
 ```
 
 ## Railway Deployment (Recommended)
@@ -481,6 +493,7 @@ railway services add redis
 ```bash
 railway variables set NODE_ENV=production
 railway variables set PORT=3000
+railway variables set API_KEY_SECRET=<32-plus-random-bytes>
 railway variables set REDIS_URL=<your-redis-url-from-step-3>
 ```
 
@@ -505,6 +518,7 @@ railway up
 |----------|-------|-------------|
 | `NODE_ENV` | `production` | Set production mode |
 | `PORT` | `3000` | Railway sets this automatically |
+| `API_KEY_SECRET` | `32+ random bytes` | Required HMAC secret for API key hashing/validation |
 | `REDIS_URL` | `redis://...` | Railway Redis connection URL |
 
 ### Railway Pricing
@@ -532,10 +546,10 @@ PORT=8080 docker-compose up -d
 docker build -t textforge .
 
 # Run without Redis
-docker run -p 3000:3000 textforge
+docker run -p 3000:3000 -e API_KEY_SECRET=dev-secret textforge
 
 # Run with Redis
-docker run -p 3000:3000 -e REDIS_URL=redis://host.docker.io:6379 textforge
+docker run -p 3000:3000 -e API_KEY_SECRET=dev-secret -e REDIS_URL=redis://host.docker.io:6379 textforge
 ```
 
 ## Error Responses
@@ -585,6 +599,7 @@ textforge/
 ├── transformations.js  # All 23 transformation functions
 ├── rateLimiter.js      # Rate limiting middleware
 ├── cache.js            # Redis cache wrapper with fallback
+├── apiKeys.js          # API key format, generation, and HMAC helpers
 ├── db.js               # SQLite database module
 ├── routes/
 │   └── stripe.js       # Stripe payment routes
@@ -604,6 +619,11 @@ textforge-dashboard/    # Next.js web portal
 ├── components/         # Reusable components
 └── lib/                # Utility functions
 ```
+
+## Production Notes
+
+- **Redis:** configure `REDIS_URL` to share cache and rate-limit state across replicas. Without Redis, rate limiting is in-memory and single-instance only.
+- **SQLite:** the bundled SQLite database is fine for development and light workloads, but sustained concurrent writes can cause contention. For higher-traffic production deployments, prefer PostgreSQL or another server database.
 
 ## Testing
 

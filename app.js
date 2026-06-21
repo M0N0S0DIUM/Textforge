@@ -36,7 +36,12 @@ const {
   validateText, getAvailableActions, getTransformFunction, PRESETS
 } = require('./transformations');
 
-const { rateLimiterMiddleware, getStats: getRateStats, startCleanup } = require('./rateLimiter');
+const {
+  rateLimiterMiddleware,
+  getStats: getRateStats,
+  startCleanup,
+  initRateLimiter
+} = require('./rateLimiter');
 const { initRedis, get: cacheGet, set: cacheSet, clear: cacheClear, generateCacheKey, getStats: getCacheStats } = require('./cache');
 
 // Initialize Express app
@@ -867,16 +872,18 @@ app.use((err, req, res, next) => {
 // ============================================
 
 async function startServer() {
-  // Initialize Redis cache (non-blocking)
-  initRedis().then((available) => {
-    if (available) {
+  try {
+    const cacheAvailable = await initRedis();
+    if (cacheAvailable) {
       logger.info('Redis cache initialized successfully');
     } else {
       logger.info('Using in-memory cache fallback');
     }
-  }).catch((err) => {
+  } catch (err) {
     logger.warn('Redis initialization error', { error: err.message });
-  });
+  }
+
+  await initRateLimiter();
   
   // Start automatic cleanup for rate limiter
   startCleanup();
