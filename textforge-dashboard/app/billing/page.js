@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const plans = [
   {
@@ -29,12 +29,16 @@ const plans = [
   },
 ];
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+
 export default function Billing() {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [customerId, setCustomerId] = useState(null);
   const [message, setMessage] = useState(null);
+  const [invoices, setInvoices] = useState([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
 
   // Load customer data from localStorage
   useEffect(() => {
@@ -49,6 +53,19 @@ export default function Billing() {
       }
     }
   }, []);
+
+  // Fetch invoices when customerId is available
+  useEffect(() => {
+    if (!customerId) return;
+    setInvoicesLoading(true);
+    fetch(`${API_URL}/api/billing/invoices?customerId=${encodeURIComponent(customerId)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.invoices) setInvoices(data.invoices);
+      })
+      .catch((err) => console.error('Failed to fetch invoices:', err))
+      .finally(() => setInvoicesLoading(false));
+  }, [customerId]);
 
   const handleUpgrade = async (plan) => {
     if (plan.name === 'Free' || plan.name === 'Enterprise') {
@@ -67,7 +84,7 @@ export default function Billing() {
     setMessage(null);
 
     try {
-      const response = await fetch('http://localhost:3000/api/create-checkout-session', {
+      const response = await fetch(`${API_URL}/api/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, customerId }),
@@ -162,43 +179,58 @@ export default function Billing() {
       {/* Payment Methods */}
       <div className="card">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment Method</h2>
-        <div className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
-          <div className="w-12 h-8 bg-blue-600 rounded flex items-center justify-center">
-            <span className="text-white text-xs font-bold">VISA</span>
-          </div>
-          <div>
-            <div className="text-sm font-medium text-gray-900">•••• •••• •••• 4242</div>
-            <div className="text-sm text-gray-500">Expires 12/2025</div>
-          </div>
-          <span className="ml-auto text-sm text-green-600 font-medium">Current</span>
-        </div>
+        {customerId ? (
+          <p className="text-gray-500 text-sm">
+            Payment method details are managed via the Stripe customer portal. Use the portal link above to update your payment method.
+          </p>
+        ) : (
+          <p className="text-gray-500 text-sm">No payment method on file. Upgrade to Pro to add a payment method.</p>
+        )}
       </div>
 
       {/* Billing History */}
       <div className="mt-8 card">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Billing History</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead>
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              <tr>
-                <td className="px-6 py-4 text-sm text-gray-900">Jan 1, 2024</td>
-                <td className="px-6 py-4 text-sm text-gray-600">Free Plan</td>
-                <td className="px-6 py-4 text-sm text-gray-900">$0.00</td>
-                <td className="px-6 py-4">
-                  <span className="px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-full">Paid</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        {invoicesLoading ? (
+          <p className="text-gray-500 text-sm">Loading billing history...</p>
+        ) : invoices.length === 0 ? (
+          <p className="text-gray-500 text-sm">No billing history available.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {invoices.map((inv) => (
+                  <tr key={inv.id}>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {inv.period_start ? new Date(inv.period_start).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{inv.stripe_invoice_id}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      ${((inv.amount_paid || 0) / 100).toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        inv.status === 'paid'
+                          ? 'text-green-700 bg-green-100'
+                          : 'text-yellow-700 bg-yellow-100'
+                      }`}>
+                        {inv.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

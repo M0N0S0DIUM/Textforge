@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Copy, Check, RefreshCw, Trash2, Key } from 'lucide-react';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+
 export default function Keys() {
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,7 +15,7 @@ export default function Keys() {
   useEffect(() => {
     const fetchKeys = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/keys');
+        const response = await fetch(`${API_URL}/api/keys`);
         const data = await response.json();
         if (data.success) {
           setKeys(data.keys);
@@ -40,15 +42,14 @@ export default function Keys() {
     }
 
     try {
-      // In production, this would call a backend endpoint to generate a new key
-      const newKey = 'tf_pro_' + Math.random().toString(36).substring(2, 34) + Math.random().toString(36).substring(2, 34);
-      const newKeyData = {
-        key: newKey,
-        tier: 'pro',
-        created_at: new Date().toISOString(),
-      };
-      setKeys([newKeyData, ...keys]);
-      setMessage({ type: 'success', text: 'New API key generated successfully!' });
+      const response = await fetch(`${API_URL}/api/keys`, { method: 'POST' });
+      const data = await response.json();
+      if (data.success && data.key) {
+        setKeys([data.key, ...keys]);
+        setMessage({ type: 'success', text: 'New API key generated successfully!' });
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to generate new key.' });
+      }
     } catch (err) {
       setMessage({ type: 'error', text: 'Failed to generate new key.' });
     }
@@ -60,9 +61,14 @@ export default function Keys() {
     }
 
     try {
-      // In production, this would call a backend endpoint to revoke the key
-      setKeys(keys.filter(k => k.id !== keyId));
-      setMessage({ type: 'success', text: 'API key revoked successfully.' });
+      const response = await fetch(`${API_URL}/api/keys/${keyId}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (data.success) {
+        setKeys(keys.filter((k) => k.id !== keyId));
+        setMessage({ type: 'success', text: 'API key revoked successfully.' });
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to revoke key.' });
+      }
     } catch (err) {
       setMessage({ type: 'error', text: 'Failed to revoke key.' });
     }

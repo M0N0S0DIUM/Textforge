@@ -14,6 +14,64 @@ const TIER_PRICE_MAP = {
 };
 
 // ──────────────────────────────────────────────
+// API Keys
+// ──────────────────────────────────────────────
+
+// GET /api/keys  — list all API keys
+router.get('/keys', (req, res) => {
+  try {
+    const keys = db
+      .prepare('SELECT id, key, tier, customer_id, created_at FROM api_keys ORDER BY created_at DESC')
+      .all();
+    res.json({ success: true, keys });
+  } catch (error) {
+    logger.error('Error fetching API keys', { error: error.message });
+    res.status(500).json({ error: 'Failed to fetch API keys' });
+  }
+});
+
+// POST /api/keys  — create a new API key (server-side secure generation)
+router.post('/keys', (req, res) => {
+  try {
+    const { customer_id, tier = 'pro' } = req.body || {};
+    const apiKey = generateApiKey();
+    const apiKeyHash = hashApiKey(apiKey);
+
+    const result = db
+      .prepare(
+        'INSERT INTO api_keys (key, key_hash, customer_id, tier) VALUES (?, ?, ?, ?)'
+      )
+      .run(apiKey, apiKeyHash, customer_id || null, tier);
+
+    const created = db
+      .prepare('SELECT id, key, tier, customer_id, created_at FROM api_keys WHERE id = ?')
+      .get(result.lastInsertRowid);
+
+    logger.info('API key created', { id: created.id, tier });
+    res.status(201).json({ success: true, key: created });
+  } catch (error) {
+    logger.error('Error creating API key', { error: error.message });
+    res.status(500).json({ error: 'Failed to create API key' });
+  }
+});
+
+// DELETE /api/keys/:id  — revoke an API key by id
+router.delete('/keys/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'API key not found' });
+    }
+    logger.info('API key revoked', { id });
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('Error revoking API key', { error: error.message });
+    res.status(500).json({ error: 'Failed to revoke API key' });
+  }
+});
+
+// ──────────────────────────────────────────────
 // Checkout
 // ──────────────────────────────────────────────
 
