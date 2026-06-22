@@ -42,11 +42,11 @@ async function initRedis() {
     });
     
     redisClient.on('connect', () => {
-      redisAvailable = true;
+      _redisAvailable = true;
     });
     
     await redisClient.connect();
-    _redisAvailable = true;
+    __redisAvailable = true;
     return true;
   } catch (err) {
     _redisAvailable = false;

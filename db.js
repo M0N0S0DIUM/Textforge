@@ -180,19 +180,27 @@ async function get(text, values = []) {
 
 /**
  * Prepare a statement for execution (for compatibility with existing code)
+ * Converts SQLite-style ? placeholders to PostgreSQL $1, $2, etc.
  * @param {string} text - SQL query text
  * @returns {object} Statement object with get and run methods
  */
 function prepare(text) {
+  // Convert ? placeholders to PostgreSQL $1, $2, etc.
+  let paramIndex = 0;
+  const convertedText = text.replace(/\?/g, () => {
+    paramIndex++;
+    return '$' + paramIndex;
+  });
+  
   return {
     async get(values = []) {
-      const result = await query(text, values);
+      const result = await query(convertedText, values);
       return result.rows[0] || null;
     },
     
     async run(values = []) {
-      const result = await query(text, values);
-      return { rowsAffected: result.rowCount };
+      const result = await query(convertedText, values);
+      return { rowsAffected: result.rowCount, lastInsertRowid: result.rows[0]?.id };
     }
   };
 }

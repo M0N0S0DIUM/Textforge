@@ -23,7 +23,7 @@ const CLEANUP_INTERVAL = 60 * 60 * 1000; // Clean up every hour
 
 const rateLimitStore = new Map();
 let redisClient = null;
-let _redisAvailable = false;
+let __redisAvailable = false;
 let warnedInMemoryFallback = false;
 
 /**
@@ -63,7 +63,7 @@ async function initRateLimiter() {
   const url = process.env.REDIS_URL;
 
   if (!url) {
-    _redisAvailable = false;
+    __redisAvailable = false;
     redisClient = null;
     logger.info('Rate limiter: REDIS_URL is not configured; using in-memory mode');
     logInMemoryFallback('REDIS_URL not configured');
@@ -76,7 +76,7 @@ async function initRateLimiter() {
 
     redisClient.on('error', (err) => {
       const wasAvailable = _redisAvailable;
-      _redisAvailable = false;
+      __redisAvailable = false;
       redisClient = null;
       if (wasAvailable) {
         logger.warn('Rate limiter: Redis connection lost; falling back to in-memory mode', { error: err.message });
@@ -90,7 +90,7 @@ async function initRateLimiter() {
     logger.info('Rate limiter: Redis initialized successfully');
     return true;
   } catch (err) {
-    _redisAvailable = false;
+    __redisAvailable = false;
     redisClient = null;
     logger.warn('Rate limiter: Redis configured but unavailable; falling back to in-memory mode', {
       error: err.message
@@ -132,7 +132,7 @@ async function incrementRateLimit(identifier) {
     try {
       return await incrementRedisRateLimit(identifier);
     } catch (err) {
-      redisAvailable = false;
+      _redisAvailable = false;
       redisClient = null;
       logger.warn('Rate limiter: Redis request failed; switching to in-memory mode for this instance', { error: err.message });
       logInMemoryFallback('Redis request failed mid-flight');
