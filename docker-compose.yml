@@ -1,6 +1,24 @@
 version: '3.8'
 
 services:
+  # PostgreSQL database service
+  postgres:
+    image: postgres:15-alpine
+    container_name: textforge-postgres
+    environment:
+      POSTGRES_USER: textforge
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: textforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U textforge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Redis cache service
   redis:
     image: redis:7-alpine
@@ -26,9 +44,14 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
+      - DATABASE_URL=postgresql://textforge:password@postgres:5432/textforge
       - REDIS_URL=redis://redis:6379
       - NODE_ENV=production
+      # Generate a secure secret with: openssl rand -hex 32
+      - API_KEY_SECRET=replace-with-a-long-random-secret
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
@@ -39,4 +62,5 @@ services:
       retries: 3
 
 volumes:
+  postgres-data:
   redis-data:

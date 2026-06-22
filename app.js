@@ -35,6 +35,8 @@ const {
   base64decode, hash, random, palindromecheck,
   validateText, getAvailableActions, getTransformFunction, PRESETS
 } = require('./transformations');
+const swaggerUi = require('swagger-ui-express');
+const openapiSpec = require('./openapi.yaml');
 
 const {
   rateLimiterMiddleware,
@@ -42,7 +44,7 @@ const {
   startCleanup,
   initRateLimiter
 } = require('./rateLimiter');
-const { initRedis, get: cacheGet, set: cacheSet, clear: cacheClear, generateCacheKey, getStats: getCacheStats } = require('./cache');
+const { initRedis, get: cacheGet, set: cacheSet, clear: cacheClear, generateCacheKey, getStats: getCacheStats, redisAvailable: cacheRedisAvailable } = require('./cache');
 
 // Initialize Express app
 const app = express();
@@ -51,6 +53,18 @@ const app = express();
 const _parsedPort = parseInt(process.env.PORT, 10);
 const PORT = !isNaN(_parsedPort) ? _parsedPort : 3000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+
+// ============================================
+// Request ID Tracking (for debugging and tracing)
+// ============================================
+
+/**
+ * Generate a unique request ID
+ * @returns {string} Unique request ID
+ */
+function generateRequestId() {
+  return `req_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+}
 
 // ============================================
 // Statistics Tracking
@@ -64,6 +78,15 @@ const stats = {
   errors: 0,
   startTime: Date.now()
 };
+
+// ============================================
+// Request ID Tracking Middleware
+// ============================================
+app.use((req, res, next) => {
+  req.id = req.headers['x-request-id'] || generateRequestId();
+  res.set('X-Request-ID', req.id);
+  next();
+});
 
 // ============================================
 // Middleware
@@ -84,7 +107,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Request logging middleware
+// Request logging middleware with request ID
 app.use((req, res, next) => {
   const start = Date.now();
   
@@ -94,10 +117,11 @@ app.use((req, res, next) => {
     const method = req.method;
     const url = req.originalUrl;
     const status = res.statusCode;
+    const requestId = req.id || 'unknown';
     
     // Log in development mode
     if (NODE_ENV === 'development') {
-      logger.debug(`${method} ${url} - ${status} (${duration}ms)`);
+      logger.debug(`${method} ${url} - ${status} (${duration}ms) [${requestId}]`);
     }
   });
   
@@ -154,12 +178,13 @@ function isValidWebhookUrl(url) {
 
 /**
  * Execute a single transformation with caching and timing
+ * @param {Request} req - Express request object (for logging)
  * @param {string} text - Input text
  * @param {string} action - Transformation action
  * @param {object} params - Additional parameters
  * @returns {Promise<object>} Result object
  */
-async function executeTransform(text, action, params = {}) {
+async function executeTransform(req, text, action, params = {}) {
   const start = Date.now();
   
   // Check cache first
@@ -187,7 +212,7 @@ async function executeTransform(text, action, params = {}) {
       result = transformFn(text);
     }
   } catch (err) {
-    logger.error('Transformation execution failed', { action, error: err.message });
+    logger.error('Transformation execution failed', { action, error: err.message, requestId: req.id });
     return { error: `Transformation failed: ${err.message}`, status: 500 };
   }
   
@@ -213,17 +238,18 @@ async function executeTransform(text, action, params = {}) {
 
 /**
  * Execute chained transformations
+ * @param {Request} req - Express request object (for logging)
  * @param {string} text - Input text
  * @param {string[]} actions - Array of transformation actions
  * @param {object} params - Additional parameters
  * @returns {Promise<object>} Result with all transformations
  */
-async function executeChainedTransform(text, actions, params = {}) {
+async function executeChainedTransform(req, text, actions, params = {}) {
   let currentText = text;
   const results = {};
   
   for (const action of actions) {
-    const result = await executeTransform(currentText, action, params);
+    const result = await executeTransform(req, currentText, action, params);
     if (result && result.error) {
       return { error: result.error, status: result.status };
     }
@@ -241,16 +267,17 @@ async function executeChainedTransform(text, actions, params = {}) {
 
 /**
  * Execute all transformations (preview mode)
+ * @param {Request} req - Express request object (for logging)
  * @param {string} text - Input text
  * @param {object} params - Additional parameters
  * @returns {Promise<object>} All transformation results
  */
-async function executeAllTransforms(text, params = {}) {
+async function executeAllTransforms(req, text, params = {}) {
   const actions = getAvailableActions();
   const results = {};
   
   for (const action of actions) {
-    const result = await executeTransform(text, action, params);
+    const result = await executeTransform(req, text, action, params);
     if (result && result.result !== undefined && !result.error) {
       results[action] = result.result;
     } else if (result && result.error) {
@@ -292,36 +319,67 @@ async function sendWebhook(webhookUrl, data) {
 const stripeRouter = require('./routes/stripe');
 app.use('/api', stripeRouter);
 
+// Admin routes (testing/development only)
+const adminRouter = require('./routes/admin');
+app.use('/admin', adminRouter);
+
 // ============================================
 // Routes
 // ============================================
 
 /**
  * GET /health - Health check endpoint
- * Returns API status, database status, and uptime
+ * Returns API status, database status, Redis connectivity, and uptime
  */
-app.get('/health', (req, res) => {
+/**
+ * GET /health - Health check endpoint
+ * Returns API status, database status, Redis connectivity, and uptime
+ */
+app.get('/health', async (req, res) => {
   const uptime = Math.floor((Date.now() - stats.startTime) / 1000);
   const cacheStats = getCacheStats();
+  
+  // Get Redis health status from cache module
+  const cacheRedisAvailable = cacheRedisAvailable;
+  
+  let redisStatus = cacheRedisAvailable ? 'connected' : 'not_configured';
 
   // Quick database liveness probe
   let dbStatus = 'healthy';
   try {
-    db.prepare('SELECT 1').get();
+    await db.get('SELECT 1');
   } catch (err) {
     dbStatus = 'unhealthy';
     logger.error('Database health check failed', { error: err.message });
   }
 
-  const status = dbStatus === 'healthy' ? 'healthy' : 'degraded';
+  // Check if all migrations are applied
+  let migrationsStatus = 'completed';
+  try {
+    const result = await db.query('SELECT COUNT(*) as count FROM schema_migrations');
+    if (result.rows.length === 0) {
+      migrationsStatus = 'not_started';
+    }
+  } catch (err) {
+    migrationsStatus = 'error';
+    logger.warn('Migration status check failed', { error: err.message });
+  }
+
+  const status = (dbStatus === 'healthy' && redisStatus !== 'unhealthy') ? 'healthy' : 'degraded';
 
   res.status(status === 'healthy' ? 200 : 503).json({
     success: status === 'healthy',
     status,
     uptime_seconds: uptime,
     database: dbStatus,
-    cache: cacheStats,
-    version: '1.0.0'
+    redis: redisStatus,
+    migrations: migrationsStatus,
+    cache: {
+      ...cacheStats,
+      backend: cacheRedisAvailable ? 'redis' : 'memory'
+    },
+    version: '1.0.0',
+    requestId: req.id
   });
 });
 
@@ -399,8 +457,8 @@ async function processTransformRequest({ text, action, actions, preview, preset,
 
   // Handle preview mode - return all transformations
   if (preview) {
-    const params = { limit, length, type };
-    const transformations = await executeAllTransforms(text, params);
+  const params = { limit, length, type };
+  const transformations = await executeAllTransforms(req, text, params);
     const executionTime = Date.now() - startTime;
 
     if (webhook) {
@@ -417,9 +475,9 @@ async function processTransformRequest({ text, action, actions, preview, preset,
 
   // Handle presets
   if (preset && PRESETS[preset]) {
-    const presetActions = PRESETS[preset];
-    const params = { limit, length, type };
-    const result = await executeChainedTransform(text, presetActions, params);
+  const presetActions = PRESETS[preset];
+  const params = { limit, length, type };
+  const result = await executeChainedTransform(req, text, presetActions, params);
     const executionTime = Date.now() - startTime;
 
     if (result.error) {
@@ -441,8 +499,8 @@ async function processTransformRequest({ text, action, actions, preview, preset,
 
   // Handle chaining (actions is always an array here)
   if (actions && actions.length > 0) {
-    const params = { limit, length, type };
-    const result = await executeChainedTransform(text, actions, params);
+  const params = { limit, length, type };
+  const result = await executeChainedTransform(req, text, actions, params);
     const executionTime = Date.now() - startTime;
 
     if (result.error) {
@@ -470,7 +528,7 @@ async function processTransformRequest({ text, action, actions, preview, preset,
 
   // Single transformation
   const params = { limit, length, type };
-  const result = await executeTransform(text, action, params);
+  const result = await executeTransform(req, text, action, params);
   const executionTime = Date.now() - startTime;
 
   if (!result) {
@@ -650,7 +708,7 @@ app.post('/batch', async (req, res) => {
           };
         }
         
-        const result = await executeTransform(item, action, params);
+        const result = await executeTransform(req, item, action, params);
         
         if (!result) {
           return {
@@ -712,6 +770,11 @@ app.post('/batch', async (req, res) => {
 });
 
 // ============================================
+// Swagger UI Documentation
+// ============================================
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
+
+// ============================================
 // Error Handling
 // ============================================
 
@@ -768,12 +831,11 @@ async function startServer() {
   // Start automatic cleanup for rate limiter
   startCleanup();
   
-  // Start Express server
-  const server = app.listen(PORT, () => {
+  // Start Express server and store reference for graceful shutdown
+  server = app.listen(PORT, () => {
     logger.info(`TextForge API listening on port ${PORT}`, { env: NODE_ENV });
   });
   return server;
-}
 
 // Only auto-start the server when this file is the entry point (not when required by tests)
 if (require.main === module) {
@@ -783,5 +845,74 @@ if (require.main === module) {
   });
 }
 
-// Export for testing
-module.exports = { app, startServer };
+// ============================================
+// Graceful Shutdown Handling
+// ============================================
+
+let server = null;
+let isShuttingDown = false;
+
+/**
+ * Gracefully shutdown the application
+ * @param {string} signal - The signal that triggered shutdown
+ */
+async function gracefulShutdown(signal) {
+  if (isShuttingDown) {
+    logger.warn('Shutdown already in progress');
+    return;
+  }
+  isShuttingDown = true;
+  
+  logger.info(`Received ${signal}. Starting graceful shutdown...`);
+  const startTime = Date.now();
+  
+  try {
+    // Close server first to stop accepting new connections
+    if (server) {
+      await new Promise((resolve, reject) => {
+        server.close(resolve);
+        setTimeout(() => reject(new Error('Server close timeout')), 10000); // 10s timeout
+      });
+      logger.info('HTTP server closed');
+    }
+    
+    // Close database connection
+    try {
+      db.close();
+      logger.info('Database connection closed');
+    } catch (dbErr) {
+      logger.warn('Database close error', { error: dbErr.message });
+    }
+    
+    // Stop rate limiter cleanup interval
+    clearInterval(startCleanup());
+    logger.info('Rate limiter cleanup stopped');
+    
+    // Close Redis connection if available
+    try {
+      const redis = await import('redis');
+      if (redisClient) {
+        await redisClient.quit();
+        logger.info('Redis connection closed');
+      }
+    } catch (redisErr) {
+      logger.warn('Redis close error', { error: redisErr.message });
+    }
+    
+    const duration = Date.now() - startTime;
+    logger.info(`Graceful shutdown completed in ${duration}ms`);
+  } catch (err) {
+    logger.error('Error during graceful shutdown', err);
+    process.exit(1);
+  }
+  
+  // Exit with success code
+  process.exit(0);
+}
+
+// Register signal handlers for graceful shutdown
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Export for testing and standalone execution
+module.exports = { app, startServer, gracefulShutdown };

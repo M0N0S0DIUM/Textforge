@@ -24,4 +24,24 @@ npm-debug.log*
 Thumbs.db
 
 # Build / dist
-dist/
+/dist/
+/build/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Railway (optional - contains local config)
+railway.toml
+.railway/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Docker Compose secrets (if used)
+.env.docker
+*.env.docker

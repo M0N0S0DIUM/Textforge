@@ -1,0 +1,460 @@
+# TextForge API - OpenAPI 3.0 Specification
+# Smart Text Utility API with 23 text transformations
+
+openapi: 3.0.3
+info:
+  title: TextForge API
+  description: |
+    A lightweight REST API providing **23 text transformation utilities** through a single, simple endpoint.
+    
+    Features:
+    - 23 text transformation functions (slugify, camelcase, reverse, etc.)
+    - Chained transformations
+    - Batch processing
+    - Rate limiting with tiered access
+    - Webhook support
+    - Redis caching
+    
+    ## Authentication
+    Free tier: No API key required (1000 requests/day)
+    
+    Pro tier: Include `X-API-Key` header (50,000 requests/day)
+    
+  version: 1.0.0
+  contact:
+    name: TextForge Support
+    email: support@textforge.example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.textforge.example.com/v1
+    description: Production server
+  - url: http://localhost:3000
+    description: Development server
+
+paths:
+  /health:
+    get:
+      summary: Health Check
+      description: Returns API status, database status, Redis connectivity, and uptime
+      operationId: healthCheck
+      tags:
+        - System
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  status:
+                    type: string
+                    enum: [healthy, degraded]
+                    example: healthy
+                  uptime_seconds:
+                    type: integer
+                    example: 3600
+                  database:
+                    type: string
+                    enum: [healthy, unhealthy]
+                    example: healthy
+                  redis:
+                    type: string
+                    enum: [connected, not_configured]
+                    example: connected
+                  migrations:
+                    type: string
+                    example: completed
+                  cache:
+                    $ref: '#/components/schemas/CacheStats'
+                  version:
+                    type: string
+                    example: "1.0.0"
+        '503':
+          description: Service is degraded or unavailable
+
+  /stats:
+    get:
+      summary: API Statistics
+      description: Returns request counts, popular actions, and rate limit statistics
+      operationId: getStats
+      tags:
+        - System
+      responses:
+        '200':
+          description: Success response with statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  stats:
+                    $ref: '#/components/schemas/APIStats'
+
+  /transform:
+    get:
+      summary: Single Text Transformation (GET)
+      description: Transform text using a single transformation action via query parameters
+      operationId: transformGet
+      tags:
+        - Transformations
+      parameters:
+        - name: text
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "Hello World!"
+            minLength: 1
+            maxLength: 10485760
+        - name: action
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [slugify, camelcase, snakecase, kebabcase, pascalcase, constantcase, sentencecase, titlecase, reverse, countwords, removemultiple, removespecial, extractemails, extracturls, extractnumbers, truncate, leet, morse, base64encode, base64decode, hash, random, palindromecheck]
+            example: slugify
+        - name: actions
+          in: query
+          required: false
+          schema:
+            type: string
+            description: Comma-separated list of actions for chaining transformations
+            example: "slugify,reverse"
+        - name: preview
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+            example: true
+        - name: preset
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [url, human, clean]
+            example: url
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            example: 50
+        - name: length
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            example: 16
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [alnum, alpha, numeric, hex]
+            default: alnum
+        - name: webhook
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+            example: "https://example.com/webhook"
+      responses:
+        '200':
+          description: Transformation successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransformResponse'
+        '400':
+          description: Invalid request parameters
+        '429':
+          description: Rate limit exceeded
+
+    post:
+      summary: Single Text Transformation (POST)
+      description: Transform text using a single transformation action via JSON body
+      operationId: transformPost
+      tags:
+        - Transformations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransformRequest'
+      responses:
+        '200':
+          description: Transformation successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransformResponse'
+        '400':
+          description: Invalid request body
+        '429':
+          description: Rate limit exceeded
+
+  /batch:
+    post:
+      summary: Batch Text Processing
+      description: Process multiple texts in a single request
+      operationId: batchProcess
+      tags:
+        - Transformations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - items
+                - action
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: string
+                  example: ["Hello World", "Foo Bar"]
+                  minItems: 1
+                  maxItems: 100
+                action:
+                  type: string
+                  enum: [slugify, camelcase, snakecase, kebabcase, pascalcase, constantcase, sentencecase, titlecase, reverse, countwords, removemultiple, removespecial, extractemails, extracturls, extractnumbers, truncate, leet, morse, base64encode, base64decode, hash, random, palindromecheck]
+                  example: slugify
+                limit:
+                  type: integer
+                  minimum: 1
+                  example: 50
+                length:
+                  type: integer
+                  minimum: 1
+                  example: 16
+                type:
+                  type: string
+                  enum: [alnum, alpha, numeric, hex]
+                  default: alnum
+                webhook:
+                  type: string
+                  format: uri
+                  example: "https://example.com/webhook"
+      responses:
+        '200':
+          description: Batch processing successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchResponse'
+        '400':
+          description: Invalid request body
+        '429':
+          description: Rate limit exceeded
+
+components:
+  schemas:
+    TransformRequest:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          example: "Hello World!"
+          minLength: 1
+          maxLength: 10485760
+        action:
+          type: string
+          enum: [slugify, camelcase, snakecase, kebabcase, pascalcase, constantcase, sentencecase, titlecase, reverse, countwords, removemultiple, removespecial, extractemails, extracturls, extractnumbers, truncate, leet, morse, base64encode, base64decode, hash, random, palindromecheck]
+          example: slugify
+        actions:
+          type: array
+          items:
+            type: string
+          example: ["slugify", "reverse"]
+        preview:
+          type: boolean
+          default: false
+        preset:
+          type: string
+          enum: [url, human, clean]
+          example: url
+        limit:
+          type: integer
+          minimum: 1
+          example: 50
+        length:
+          type: integer
+          minimum: 1
+          example: 16
+        type:
+          type: string
+          enum: [alnum, alpha, numeric, hex]
+          default: alnum
+        webhook:
+          type: string
+          format: uri
+
+    TransformResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        original:
+          type: string
+          example: "Hello World!"
+        action:
+          type: string
+          example: slugify
+        actions:
+          type: array
+          items:
+            type: string
+        result:
+          type: string
+          example: "hello-world"
+        transformations:
+          type: object
+          description: All transformation results when preview=true
+        preset:
+          type: string
+        execution_time_ms:
+          type: integer
+          example: 2
+
+    BatchResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        action:
+          type: string
+          example: slugify
+        totalItems:
+          type: integer
+          example: 3
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchResultItem'
+        execution_time_ms:
+          type: integer
+
+    BatchResultItem:
+      type: object
+      properties:
+        index:
+          type: integer
+          example: 0
+        original:
+          type: string
+          example: "Hello World"
+        success:
+          type: boolean
+          example: true
+        action:
+          type: string
+        result:
+          type: string
+          example: "hello-world"
+
+    CacheStats:
+      type: object
+      properties:
+        redisAvailable:
+          type: boolean
+          example: true
+        memoryCacheSize:
+          type: integer
+          example: 42
+        maxCacheSize:
+          type: integer
+          example: 1000
+
+    APIStats:
+      type: object
+      properties:
+        totalRequests:
+          type: integer
+          example: 1523
+        totalTransformations:
+          type: integer
+          example: 1200
+        topActions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopAction'
+        rateLimit:
+          $ref: '#/components/schemas/RateLimitStats'
+        cache:
+          $ref: '#/components/schemas/CacheStats'
+        uptime_seconds:
+          type: integer
+
+    TopAction:
+      type: object
+      properties:
+        action:
+          type: string
+          example: slugify
+        count:
+          type: integer
+          example: 450
+
+    RateLimitStats:
+      type: object
+      properties:
+        backend:
+          type: string
+          enum: [redis, memory]
+        redisAvailable:
+          type: boolean
+        totalEntries:
+          type: integer
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/RateLimitEntry'
+
+    RateLimitEntry:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Hashed identifier
+        count:
+          type: integer
+          example: 100
+        resetAt:
+          type: integer
+          format: unix-time
+
+security:
+  - ApiKeyAuth: []
+
+securitySchemes:
+  ApiKeyAuth:
+    type: apiKey
+    in: header
+    name: X-API-Key
+    description: |
+      Include your API key in the `X-API-Key` header.
+      
+      Free tier: No key required (1000 requests/day)
+      
+      Pro tier: Format is `tf_pro_<32-hex-chars>` (50,000 requests/day)

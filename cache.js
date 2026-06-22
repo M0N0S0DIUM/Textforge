@@ -16,7 +16,7 @@ const DEFAULT_TTL = 3600; // Default TTL in seconds (1 hour)
 const memoryCache = new Map();
 
 let redisClient = null;
-let redisAvailable = false;
+let _redisAvailable = false;
 
 /**
  * Initialize Redis client if REDIS_URL is provided
@@ -46,10 +46,10 @@ async function initRedis() {
     });
     
     await redisClient.connect();
-    redisAvailable = true;
+    _redisAvailable = true;
     return true;
   } catch (err) {
-    redisAvailable = false;
+    _redisAvailable = false;
     redisClient = null;
     return false;
   }
@@ -82,12 +82,13 @@ function generateCacheKey(text, action, params = {}) {
  */
 async function get(key) {
   // Try Redis first
-  if (redisAvailable && redisClient) {
+  if (_redisAvailable && redisClient) {
     try {
       const value = await redisClient.get(key);
       return value ? JSON.parse(value) : null;
-    } catch {
+    } catch (err) {
       // Redis failed, fall through to memory cache
+      console.error('Cache get error:', err.message);
     }
   }
   
@@ -117,12 +118,13 @@ async function set(key, value, ttl = DEFAULT_TTL) {
   };
   
   // Try Redis first
-  if (redisAvailable && redisClient) {
+  if (_redisAvailable && redisClient) {
     try {
       await redisClient.setEx(key, ttl, JSON.stringify(value));
       return;
-    } catch {
+    } catch (err) {
       // Redis failed, fall through to memory cache
+      console.error('Cache get error:', err.message);
     }
   }
   
@@ -141,11 +143,12 @@ async function set(key, value, ttl = DEFAULT_TTL) {
  * @param {string} key - Cache key
  */
 async function del(key) {
-  if (redisAvailable && redisClient) {
+  if (_redisAvailable && redisClient) {
     try {
       await redisClient.del(key);
-    } catch {
+    } catch (err) {
       // Ignore Redis errors
+      console.error('Cache del error:', err.message);
     }
   }
   memoryCache.delete(key);
@@ -158,8 +161,9 @@ async function clear() {
   if (redisAvailable && redisClient) {
     try {
       await redisClient.flushDb();
-    } catch {
+    } catch (err) {
       // Ignore Redis errors
+      console.error('Cache clear error:', err.message);
     }
   }
   memoryCache.clear();
@@ -171,7 +175,7 @@ async function clear() {
  */
 function getStats() {
   return {
-    redisAvailable,
+    redisAvailable: _redisAvailable,
     memoryCacheSize: memoryCache.size,
     maxCacheSize: MAX_CACHE_SIZE
   };
@@ -195,5 +199,7 @@ module.exports = {
   getStats,
   isAvailable,
   DEFAULT_TTL,
-  MAX_CACHE_SIZE
+  MAX_CACHE_SIZE,
+  // Expose Redis availability for health checks
+  get redisAvailable() { return _redisAvailable; }
 };

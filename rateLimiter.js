@@ -23,7 +23,7 @@ const CLEANUP_INTERVAL = 60 * 60 * 1000; // Clean up every hour
 
 const rateLimitStore = new Map();
 let redisClient = null;
-let redisAvailable = false;
+let _redisAvailable = false;
 let warnedInMemoryFallback = false;
 
 /**
@@ -63,7 +63,7 @@ async function initRateLimiter() {
   const url = process.env.REDIS_URL;
 
   if (!url) {
-    redisAvailable = false;
+    _redisAvailable = false;
     redisClient = null;
     logger.info('Rate limiter: REDIS_URL is not configured; using in-memory mode');
     logInMemoryFallback('REDIS_URL not configured');
@@ -75,8 +75,8 @@ async function initRateLimiter() {
     redisClient = redis.createClient({ url });
 
     redisClient.on('error', (err) => {
-      const wasAvailable = redisAvailable;
-      redisAvailable = false;
+      const wasAvailable = _redisAvailable;
+      _redisAvailable = false;
       redisClient = null;
       if (wasAvailable) {
         logger.warn('Rate limiter: Redis connection lost; falling back to in-memory mode', { error: err.message });
@@ -85,12 +85,12 @@ async function initRateLimiter() {
     });
 
     await redisClient.connect();
-    redisAvailable = true;
+    _redisAvailable = true;
     warnedInMemoryFallback = false;
     logger.info('Rate limiter: Redis initialized successfully');
     return true;
   } catch (err) {
-    redisAvailable = false;
+    _redisAvailable = false;
     redisClient = null;
     logger.warn('Rate limiter: Redis configured but unavailable; falling back to in-memory mode', {
       error: err.message
@@ -128,7 +128,7 @@ async function incrementRedisRateLimit(identifier) {
 }
 
 async function incrementRateLimit(identifier) {
-  if (redisAvailable && redisClient) {
+  if (_redisAvailable && redisClient) {
     try {
       return await incrementRedisRateLimit(identifier);
     } catch (err) {
@@ -149,45 +149,45 @@ function safeEqualHex(left, right) {
 }
 
 /**
- * Check if an API key is valid and get its tier
- * @param {string} apiKey - API key to validate
- * @returns {Promise<{ valid: boolean, tier: string, keyHash?: string }>}
- */
+* Check if an API key is valid and get its tier
+* @param {string} apiKey - API key to validate
+* @returns {Promise<{ valid: boolean, tier: string, keyHash?: string }>}
+*/
 async function validateApiKey(apiKey) {
-  if (!isApiKeyFormatValid(apiKey)) {
-    return { valid: false, tier: 'free' };
-  }
-  
-  try {
-    const apiKeyHash = hashApiKey(apiKey);
-    let keyRecord = db.prepare('SELECT * FROM api_keys WHERE key_hash = ?').get(apiKeyHash);
+if (!isApiKeyFormatValid(apiKey)) {
+return { valid: false, tier: 'free' };
+}
 
-    if (!keyRecord) {
-      keyRecord = db.prepare('SELECT * FROM api_keys WHERE key = ?').get(apiKey);
-      if (keyRecord) {
-        db.prepare('UPDATE api_keys SET key_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(
-          apiKeyHash,
-          keyRecord.id
-        );
-        keyRecord.key_hash = apiKeyHash;
-      }
-    }
-    
-    if (!keyRecord) {
-      logger.warn('Invalid API key attempted', { keyPrefix: apiKey.substring(0, 10) });
-      return { valid: false, tier: 'free' };
-    }
+try {
+const apiKeyHash = hashApiKey(apiKey);
+let keyRecord = await db.get('SELECT * FROM api_keys WHERE key_hash = $1', [apiKeyHash]);
 
-    if (keyRecord.key_hash && !safeEqualHex(apiKeyHash, keyRecord.key_hash)) {
-      logger.warn('API key hash mismatch detected', { keyId: keyRecord.id });
-      return { valid: false, tier: 'free' };
-    }
+if (!keyRecord) {
+keyRecord = await db.get('SELECT * FROM api_keys WHERE key = $1', [apiKey]);
+if (keyRecord) {
+await db.query(
+'UPDATE api_keys SET key_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+[apiKeyHash, keyRecord.id]
+);
+keyRecord.key_hash = apiKeyHash;
+}
+}
 
-    return { valid: true, tier: keyRecord.tier || 'free', keyHash: apiKeyHash };
-  } catch (err) {
-    logger.error('Error validating API key', err);
-    return { valid: false, tier: 'free' };
-  }
+if (!keyRecord) {
+logger.warn('Invalid API key attempted', { keyPrefix: apiKey.substring(0, 10) });
+return { valid: false, tier: 'free' };
+}
+
+if (keyRecord.key_hash && !safeEqualHex(apiKeyHash, keyRecord.key_hash)) {
+logger.warn('API key hash mismatch detected', { keyId: keyRecord.id });
+return { valid: false, tier: 'free' };
+}
+
+return { valid: true, tier: keyRecord.tier || 'free', keyHash: apiKeyHash };
+} catch (err) {
+logger.error('Error validating API key', err);
+return { valid: false, tier: 'free' };
+}
 }
 
 /**
@@ -311,8 +311,8 @@ function getStats() {
   }
   
   return {
-    backend: redisAvailable ? 'redis' : 'memory',
-    redisAvailable,
+    backend: _redisAvailable ? 'redis' : 'memory',
+    redisAvailable: _redisAvailable,
     totalEntries: activeEntries.length,
     entries: activeEntries
   };
@@ -326,7 +326,7 @@ async function resetRateLimit(key) {
   const normalizedKey = isApiKeyFormatValid(key) ? `api:${hashApiKey(key)}` : key;
   rateLimitStore.delete(key);
   rateLimitStore.delete(normalizedKey);
-  if (redisAvailable && redisClient) {
+  if (_redisAvailable && redisClient) {
     try {
       await redisClient.del(getRedisRateLimitKey(key));
       if (normalizedKey !== key) {
@@ -338,6 +338,8 @@ async function resetRateLimit(key) {
   }
 }
 
+// Make redisAvailable accessible from outside
+let _redisAvailable = false;
 module.exports = {
   API_KEY_PREFIX,
   initRateLimiter,
@@ -351,3 +353,4 @@ module.exports = {
   FREE_TIER_LIMIT,
   PRO_TIER_LIMIT
 };
+

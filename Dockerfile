@@ -4,8 +4,8 @@
 # ---- Base Stage ----
 FROM node:18-alpine AS base
 
-# Install wget for healthcheck
-RUN apk add --no-cache wget
+# Install wget and PostgreSQL client libraries for node-postgres
+RUN apk add --no-cache wget postgresql-client
 
 WORKDIR /app
 
