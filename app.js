@@ -22,7 +22,9 @@
  */
 
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
+const yaml = require('yaml');
 const db = require('./db');
 const logger = require('./logger');
 
@@ -36,7 +38,7 @@ const {
   validateText, getAvailableActions, getTransformFunction, PRESETS
 } = require('./transformations');
 const swaggerUi = require('swagger-ui-express');
-const openapiSpec = require('./openapi.yaml');
+const openapiSpec = yaml.load(fs.readFileSync('./openapi.yaml', 'utf8'));
 
 const {
   rateLimiterMiddleware,
@@ -340,7 +342,6 @@ app.get('/health', async (req, res) => {
   const cacheStats = getCacheStats();
   
   // Get Redis health status from cache module
-  const cacheRedisAvailable = cacheRedisAvailable;
   
   let redisStatus = cacheRedisAvailable ? 'connected' : 'not_configured';
 
