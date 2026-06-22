@@ -10,8 +10,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Tier → price ID mapping
 const TIER_PRICE_MAP = {
-  pro: process.env.STRIPE_PRO_PRICE_ID || process.env.STRIPE_PRICE_ID,
-  enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID,
+  free: null, // free tier has no price ID
+  pro: process.env.STRIPE_PRICE_ID, // single paid product
 };
 
 // Stricter rate limit for key management endpoints to prevent enumeration / abuse.
@@ -529,8 +529,7 @@ function _upsertInvoice(invoice, status) {
 // Best-guess tier from subscription items
 function _tierFromItems(sub) {
   const priceId = sub.items?.data?.[0]?.price?.id;
-  if (!priceId) return 'pro';
-  if (priceId === process.env.STRIPE_ENTERPRISE_PRICE_ID) return 'enterprise';
+  if (!priceId) return 'free';
   return 'pro';
 }
 
