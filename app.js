@@ -833,7 +833,7 @@ async function startServer() {
   startCleanup();
   
   // Start Express server and store reference for graceful shutdown
-  server = app.listen(PORT, () => {
+  server = app.listen(PORT, '0.0.0.0', () => {
     logger.info(`TextForge API listening on port ${PORT}`, { env: NODE_ENV });
   });
   return server;
