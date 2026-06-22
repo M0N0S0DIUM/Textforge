@@ -499,6 +499,31 @@ async function processTransformRequest({ text, action, actions, preview, preset,
 }
 
 /**
+ * Coerce a value that may be a string, array, or other type to a plain string.
+ * Arrays (possible via HTTP parameter tampering) are rejected by returning undefined.
+ * @param {*} val
+ * @returns {string|undefined}
+ */
+function toStr(val) {
+  if (val === undefined || val === null) return undefined;
+  if (typeof val === 'string') return val;
+  // Reject arrays and objects (parameter tampering / type confusion)
+  return undefined;
+}
+
+/**
+ * Coerce a value to a string, also accepting numbers (e.g. numeric JSON fields).
+ * Arrays and objects are rejected.
+ * @param {*} val
+ * @returns {string|undefined}
+ */
+function toStrOrNum(val) {
+  if (val === undefined || val === null) return undefined;
+  if (typeof val === 'string' || typeof val === 'number') return String(val);
+  return undefined;
+}
+
+/**
  * GET /transform - Single transformation via query parameters
  *
  * Query parameters:
@@ -513,11 +538,19 @@ async function processTransformRequest({ text, action, actions, preview, preset,
  * - webhook (optional): URL to POST result to
  */
 app.get('/transform', async (req, res) => {
-  const { text, action, preview, preset, limit, length, type, webhook } = req.query;
-  // Normalize comma-separated actions string → array; normalize preview string → boolean
-  const actions = req.query.actions ? req.query.actions.split(',').map(a => a.trim()).filter(Boolean) : undefined;
+  const text    = toStr(req.query.text);
+  const action  = toStr(req.query.action);
+  const preset  = toStr(req.query.preset);
+  const limit   = toStr(req.query.limit);
+  const length  = toStr(req.query.length);
+  const type    = toStr(req.query.type);
+  const webhook = toStr(req.query.webhook);
+  const preview = toStr(req.query.preview) === 'true';
+  // Normalize comma-separated actions string → array
+  const rawActions = toStr(req.query.actions);
+  const actions = rawActions ? rawActions.split(',').map(a => a.trim()).filter(Boolean) : undefined;
   return processTransformRequest(
-    { text, action, actions, preview: preview === 'true', preset, limit, length, type, webhook },
+    { text, action, actions, preview, preset, limit, length, type, webhook },
     res
   );
 });
@@ -538,14 +571,25 @@ app.get('/transform', async (req, res) => {
  * }
  */
 app.post('/transform', async (req, res) => {
-  const { text, action, preview, preset, limit, length, type, webhook } = req.body;
-  // Normalize actions: accept array or comma-separated string for flexibility
+  const text    = toStr(req.body.text);
+  const action  = toStr(req.body.action);
+  const preset  = toStr(req.body.preset);
+  const limit   = toStrOrNum(req.body.limit);
+  const length  = toStrOrNum(req.body.length);
+  const type    = toStr(req.body.type);
+  const webhook = toStr(req.body.webhook);
+  const preview = req.body.preview === true || req.body.preview === 'true';
+  // Normalize actions: accept array of strings or comma-separated string
   let actions = req.body.actions;
   if (typeof actions === 'string') {
     actions = actions.split(',').map(a => a.trim()).filter(Boolean);
+  } else if (Array.isArray(actions)) {
+    actions = actions.map(a => (typeof a === 'string' ? a : String(a))).filter(Boolean);
+  } else {
+    actions = undefined;
   }
   return processTransformRequest(
-    { text, action, actions, preview: preview === true || preview === 'true', preset, limit, length, type, webhook },
+    { text, action, actions, preview, preset, limit, length, type, webhook },
     res
   );
 });
