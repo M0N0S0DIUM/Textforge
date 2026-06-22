@@ -837,6 +837,7 @@ async function startServer() {
     logger.info(`TextForge API listening on port ${PORT}`, { env: NODE_ENV });
   });
   return server;
+}
 
 // Only auto-start the server when this file is the entry point (not when required by tests)
 if (require.main === module) {
@@ -845,7 +846,6 @@ if (require.main === module) {
     process.exit(1);
   });
 }
-n}
 
 // ============================================
 // Graceful Shutdown Handling
