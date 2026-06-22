@@ -773,6 +773,12 @@ app.post('/batch', async (req, res) => {
 // ============================================
 // Swagger UI Documentation
 // ============================================
+
+// Root route - redirect to API docs
+app.get('/', (req, res) => {
+  res.redirect('/api-docs');
+});
+
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
 
 // ============================================
