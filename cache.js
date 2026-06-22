@@ -16,7 +16,7 @@ const DEFAULT_TTL = 3600; // Default TTL in seconds (1 hour)
 const memoryCache = new Map();
 
 let redisClient = null;
-let __redisAvailable = false;
+let _redisAvailable = false;
 
 /**
  * Initialize Redis client if REDIS_URL is provided
@@ -49,7 +49,7 @@ async function initRedis() {
     _redisAvailable = true;
     return true;
   } catch (err) {
-    __redisAvailable = false;
+    _redisAvailable = false;
     redisClient = null;
     return false;
   }
