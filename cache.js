@@ -16,7 +16,7 @@ const DEFAULT_TTL = 3600; // Default TTL in seconds (1 hour)
 const memoryCache = new Map();
 
 let redisClient = null;
-let _redisAvailable = false;
+let __redisAvailable = false;
 
 /**
  * Initialize Redis client if REDIS_URL is provided
@@ -29,7 +29,7 @@ async function initRedis() {
     const url = process.env.REDIS_URL;
     
     if (!url) {
-      redisAvailable = false;
+      _redisAvailable = false;
       return false;
     }
     
@@ -37,7 +37,7 @@ async function initRedis() {
     
     redisClient.on('error', (err) => {
       // Redis error - fall back to no-op
-      redisAvailable = false;
+      _redisAvailable = false;
       redisClient = null;
     });
     
@@ -49,7 +49,7 @@ async function initRedis() {
     _redisAvailable = true;
     return true;
   } catch (err) {
-    _redisAvailable = false;
+    __redisAvailable = false;
     redisClient = null;
     return false;
   }
@@ -158,7 +158,7 @@ async function del(key) {
  * Clear all cached values
  */
 async function clear() {
-  if (redisAvailable && redisClient) {
+  if (_redisAvailable && redisClient) {
     try {
       await redisClient.flushDb();
     } catch (err) {
@@ -186,7 +186,7 @@ function getStats() {
  * @returns {boolean} Whether any caching backend is available
  */
 function isAvailable() {
-  return redisAvailable || memoryCache.size > 0;
+  return _redisAvailable || memoryCache.size > 0;
 }
 
 module.exports = {
