@@ -47,12 +47,12 @@ function getMemoryRateLimitEntry(key) {
   return entry;
 }
 
-function logInMemoryFallback(context) {
+function logInMemoryFallback(reason) {
   if (warnedInMemoryFallback) {
     return;
   }
   warnedInMemoryFallback = true;
-  logger.warn('Using in-memory rate limiting fallback; limits are not shared across instances', context || {});
+  logger.warn(`Rate limiter: falling back to in-memory mode (reason: ${reason}). Limits are not shared across instances.`);
 }
 
 /**
@@ -65,7 +65,8 @@ async function initRateLimiter() {
   if (!url) {
     redisAvailable = false;
     redisClient = null;
-    logInMemoryFallback({ reason: 'REDIS_URL is not configured' });
+    logger.info('Rate limiter: REDIS_URL is not configured; using in-memory mode');
+    logInMemoryFallback('REDIS_URL not configured');
     return false;
   }
 
@@ -74,24 +75,27 @@ async function initRateLimiter() {
     redisClient = redis.createClient({ url });
 
     redisClient.on('error', (err) => {
+      const wasAvailable = redisAvailable;
       redisAvailable = false;
       redisClient = null;
-      logger.warn('Redis rate limiter error; falling back to in-memory mode', { error: err.message });
-      logInMemoryFallback({ reason: 'Redis connection error' });
+      if (wasAvailable) {
+        logger.warn('Rate limiter: Redis connection lost; falling back to in-memory mode', { error: err.message });
+      }
+      logInMemoryFallback('Redis became unavailable');
     });
 
     await redisClient.connect();
     redisAvailable = true;
     warnedInMemoryFallback = false;
-    logger.info('Redis rate limiter initialized successfully');
+    logger.info('Rate limiter: Redis initialized successfully');
     return true;
   } catch (err) {
     redisAvailable = false;
     redisClient = null;
-    logger.warn('Redis rate limiter initialization failed; falling back to in-memory mode', {
+    logger.warn('Rate limiter: Redis configured but unavailable; falling back to in-memory mode', {
       error: err.message
     });
-    logInMemoryFallback({ reason: 'Redis initialization failed' });
+    logInMemoryFallback('Redis configured but connection failed');
     return false;
   }
 }
@@ -130,8 +134,8 @@ async function incrementRateLimit(identifier) {
     } catch (err) {
       redisAvailable = false;
       redisClient = null;
-      logger.warn('Redis rate limiter request failed; using in-memory mode', { error: err.message });
-      logInMemoryFallback({ reason: 'Redis request failed' });
+      logger.warn('Rate limiter: Redis request failed; switching to in-memory mode for this instance', { error: err.message });
+      logInMemoryFallback('Redis request failed mid-flight');
     }
   }
 

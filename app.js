@@ -48,7 +48,8 @@ const { initRedis, get: cacheGet, set: cacheSet, clear: cacheClear, generateCach
 const app = express();
 
 // Configuration
-const PORT = parseInt(process.env.PORT, 10) || 3000;
+const _parsedPort = parseInt(process.env.PORT, 10);
+const PORT = !isNaN(_parsedPort) ? _parsedPort : 3000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // ============================================
@@ -352,8 +353,154 @@ app.get('/stats', (req, res) => {
 });
 
 /**
+ * Shared transform request handler used by both GET and POST /transform.
+ *
+ * @param {object} p              - Normalized request parameters
+ * @param {string}  p.text        - Input text (already validated non-empty)
+ * @param {string}  [p.action]    - Single transformation action
+ * @param {string[]} [p.actions]  - Ordered list of actions for chaining (already split/normalized)
+ * @param {boolean} [p.preview]   - Return all transformations when true
+ * @param {string}  [p.preset]    - Named preset ('url', 'human', 'clean')
+ * @param {*}       [p.limit]     - Truncate limit
+ * @param {*}       [p.length]    - Random string length
+ * @param {string}  [p.type]      - Random string character set
+ * @param {string}  [p.webhook]   - Webhook URL for async result delivery
+ * @param {object}  res           - Express response object
+ */
+async function processTransformRequest({ text, action, actions, preview, preset, limit, length, type, webhook }, res) {
+  // Validate required parameters
+  if (!text) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required parameter: text',
+      status: 400
+    });
+  }
+
+  if (!action && !actions && !preview && !preset) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required parameter: action, actions, preview, or preset',
+      status: 400
+    });
+  }
+
+  // Validate text length
+  const validation = validateText(text);
+  if (!validation.valid) {
+    return res.status(400).json({
+      success: false,
+      error: validation.error,
+      status: 400
+    });
+  }
+
+  const startTime = Date.now();
+
+  // Handle preview mode - return all transformations
+  if (preview) {
+    const params = { limit, length, type };
+    const transformations = await executeAllTransforms(text, params);
+    const executionTime = Date.now() - startTime;
+
+    if (webhook) {
+      sendWebhook(webhook, { original: text, transformations, execution_time_ms: executionTime });
+    }
+
+    return res.json({
+      success: true,
+      original: text,
+      transformations,
+      execution_time_ms: executionTime
+    });
+  }
+
+  // Handle presets
+  if (preset && PRESETS[preset]) {
+    const presetActions = PRESETS[preset];
+    const params = { limit, length, type };
+    const result = await executeChainedTransform(text, presetActions, params);
+    const executionTime = Date.now() - startTime;
+
+    if (result.error) {
+      return res.status(400).json({ success: false, error: result.error, status: result.status });
+    }
+
+    if (webhook) {
+      sendWebhook(webhook, { original: text, preset, result, execution_time_ms: executionTime });
+    }
+
+    return res.json({
+      success: true,
+      original: text,
+      preset,
+      result,
+      execution_time_ms: executionTime
+    });
+  }
+
+  // Handle chaining (actions is always an array here)
+  if (actions && actions.length > 0) {
+    const params = { limit, length, type };
+    const result = await executeChainedTransform(text, actions, params);
+    const executionTime = Date.now() - startTime;
+
+    if (result.error) {
+      return res.status(400).json({ success: false, error: result.error, status: result.status });
+    }
+
+    const finalAction = actions[actions.length - 1];
+    let finalResult;
+    if (result.transformations && result.transformations[finalAction]) {
+      finalResult = result.transformations[finalAction].result;
+    }
+
+    if (webhook) {
+      sendWebhook(webhook, { original: text, actions, result: finalResult, execution_time_ms: executionTime });
+    }
+
+    return res.json({
+      success: true,
+      original: text,
+      actions,
+      result: finalResult,
+      execution_time_ms: executionTime
+    });
+  }
+
+  // Single transformation
+  const params = { limit, length, type };
+  const result = await executeTransform(text, action, params);
+  const executionTime = Date.now() - startTime;
+
+  if (!result) {
+    return res.status(400).json({
+      success: false,
+      error: `Invalid action: ${action}`,
+      status: 400
+    });
+  }
+
+  if (result.error) {
+    return res.status(500).json({ success: false, error: result.error, status: result.status });
+  }
+
+  if (webhook) {
+    sendWebhook(webhook, { original: text, action, result: result.result, execution_time_ms: executionTime });
+  }
+
+  return res.json({
+    success: true,
+    original: text,
+    action,
+    result: result.result,
+    execution_time_ms: executionTime
+  });
+}
+
+/**
  * GET /transform - Single transformation via query parameters
- * 
+ *
  * Query parameters:
  * - text (required): The text to transform
  * - action (required): Single transformation type
@@ -366,178 +513,18 @@ app.get('/stats', (req, res) => {
  * - webhook (optional): URL to POST result to
  */
 app.get('/transform', async (req, res) => {
-  const { text, action, actions, preview, preset, limit, length, type, webhook } = req.query;
-  
-  // Validate required parameters
-  if (!text) {
-    return res.status(400).json({
-      success: false,
-      error: 'Missing required parameter: text',
-      status: 400
-    });
-  }
-  
-  if (!action && !actions && !preview && !preset) {
-    return res.status(400).json({
-      success: false,
-      error: 'Missing required parameter: action, actions, preview, or preset',
-      status: 400
-    });
-  }
-  
-  // Validate text length
-  const validation = validateText(text);
-  if (!validation.valid) {
-    return res.status(400).json({
-      success: false,
-      error: validation.error,
-      status: 400
-    });
-  }
-  
-  const startTime = Date.now();
-  
-  // Handle preview mode - return all transformations
-  if (preview === 'true') {
-    const params = { limit, length, type };
-    const transformations = await executeAllTransforms(text, params);
-    const executionTime = Date.now() - startTime;
-    
-    // Send webhook if provided
-    if (webhook) {
-      sendWebhook(webhook, {
-        original: text,
-        transformations,
-        execution_time_ms: executionTime
-      });
-    }
-    
-    return res.json({
-      success: true,
-      original: text,
-      transformations,
-      execution_time_ms: executionTime
-    });
-  }
-  
-  // Handle presets
-  if (preset && PRESETS[preset]) {
-    const presetActions = PRESETS[preset];
-    const params = { limit, length, type };
-    const result = await executeChainedTransform(text, presetActions, params);
-    const executionTime = Date.now() - startTime;
-    
-    if (result.error) {
-      return res.status(400).json({
-        success: false,
-        error: result.error,
-        status: result.status
-      });
-    }
-    
-    // Send webhook if provided
-    if (webhook) {
-      sendWebhook(webhook, {
-        original: text,
-        preset,
-        result,
-        execution_time_ms: executionTime
-      });
-    }
-    
-    return res.json({
-      success: true,
-      original: text,
-      preset,
-      result,
-      execution_time_ms: executionTime
-    });
-  }
-  
-  // Handle chaining
-  if (actions) {
-    const actionList = actions.split(',').map(a => a.trim());
-    const params = { limit, length, type };
-    const result = await executeChainedTransform(text, actionList, params);
-    const executionTime = Date.now() - startTime;
-    
-    if (result.error) {
-      return res.status(400).json({
-        success: false,
-        error: result.error,
-        status: result.status
-      });
-    }
-    
-    // Get the final result (last transformation output)
-    const finalAction = actionList[actionList.length - 1];
-    let finalResult;
-    if (result.transformations && result.transformations[finalAction]) {
-      finalResult = result.transformations[finalAction].result;
-    }
-    
-    // Send webhook if provided
-    if (webhook) {
-      sendWebhook(webhook, {
-        original: text,
-        actions: actionList,
-        result: finalResult,
-        execution_time_ms: executionTime
-      });
-    }
-    
-    return res.json({
-      success: true,
-      original: text,
-      actions: actionList,
-      result: finalResult,
-      execution_time_ms: executionTime
-    });
-  }
-  
-  // Single transformation
-  const params = { limit, length, type };
-  const result = await executeTransform(text, action, params);
-  const executionTime = Date.now() - startTime;
-  
-  if (!result) {
-    return res.status(400).json({
-      success: false,
-      error: `Invalid action: ${action}`,
-      status: 400
-    });
-  }
-  
-  if (result.error) {
-    return res.status(500).json({
-      success: false,
-      error: result.error,
-      status: result.status
-    });
-  }
-  
-  // Send webhook if provided
-  if (webhook) {
-    sendWebhook(webhook, {
-      original: text,
-      action,
-      result: result.result,
-      execution_time_ms: executionTime
-    });
-  }
-  
-  res.json({
-    success: true,
-    original: text,
-    action,
-    result: result.result,
-    execution_time_ms: executionTime
-  });
+  const { text, action, preview, preset, limit, length, type, webhook } = req.query;
+  // Normalize comma-separated actions string → array; normalize preview string → boolean
+  const actions = req.query.actions ? req.query.actions.split(',').map(a => a.trim()).filter(Boolean) : undefined;
+  return processTransformRequest(
+    { text, action, actions, preview: preview === 'true', preset, limit, length, type, webhook },
+    res
+  );
 });
 
 /**
  * POST /transform - Single transformation via JSON body
- * 
+ *
  * Body:
  * {
  *   "text": "string",
@@ -551,167 +538,16 @@ app.get('/transform', async (req, res) => {
  * }
  */
 app.post('/transform', async (req, res) => {
-  const { text, action, actions, preview, preset, limit, length, type, webhook } = req.body;
-  
-  // Validate required parameters
-  if (!text) {
-    return res.status(400).json({
-      success: false,
-      error: 'Missing required field: text',
-      status: 400
-    });
+  const { text, action, preview, preset, limit, length, type, webhook } = req.body;
+  // Normalize actions: accept array or comma-separated string for flexibility
+  let actions = req.body.actions;
+  if (typeof actions === 'string') {
+    actions = actions.split(',').map(a => a.trim()).filter(Boolean);
   }
-  
-  if (!action && !actions && !preview && !preset) {
-    return res.status(400).json({
-      success: false,
-      error: 'Missing required field: action, actions, preview, or preset',
-      status: 400
-    });
-  }
-  
-  // Validate text length
-  const validation = validateText(text);
-  if (!validation.valid) {
-    return res.status(400).json({
-      success: false,
-      error: validation.error,
-      status: 400
-    });
-  }
-  
-  const startTime = Date.now();
-  
-  // Handle preview mode - return all transformations
-  if (preview === true) {
-    const params = { limit, length, type };
-    const transformations = await executeAllTransforms(text, params);
-    const executionTime = Date.now() - startTime;
-    
-    if (webhook) {
-      sendWebhook(webhook, {
-        original: text,
-        transformations,
-        execution_time_ms: executionTime
-      });
-    }
-    
-    return res.json({
-      success: true,
-      original: text,
-      transformations,
-      execution_time_ms: executionTime
-    });
-  }
-  
-  // Handle presets
-  if (preset && PRESETS[preset]) {
-    const presetActions = PRESETS[preset];
-    const params = { limit, length, type };
-    const result = await executeChainedTransform(text, presetActions, params);
-    const executionTime = Date.now() - startTime;
-    
-    if (result.error) {
-      return res.status(400).json({
-        success: false,
-        error: result.error,
-        status: result.status
-      });
-    }
-    
-    if (webhook) {
-      sendWebhook(webhook, {
-        original: text,
-        preset,
-        result,
-        execution_time_ms: executionTime
-      });
-    }
-    
-    return res.json({
-      success: true,
-      original: text,
-      preset,
-      result,
-      execution_time_ms: executionTime
-    });
-  }
-  
-  // Handle chaining
-  if (actions && Array.isArray(actions)) {
-    const params = { limit, length, type };
-    const result = await executeChainedTransform(text, actions, params);
-    const executionTime = Date.now() - startTime;
-    
-    if (result.error) {
-      return res.status(400).json({
-        success: false,
-        error: result.error,
-        status: result.status
-      });
-    }
-    
-    const finalAction = actions[actions.length - 1];
-    let finalResult;
-    if (result.transformations && result.transformations[finalAction]) {
-      finalResult = result.transformations[finalAction].result;
-    }
-    
-    if (webhook) {
-      sendWebhook(webhook, {
-        original: text,
-        actions,
-        result: finalResult,
-        execution_time_ms: executionTime
-      });
-    }
-    
-    return res.json({
-      success: true,
-      original: text,
-      actions,
-      result: finalResult,
-      execution_time_ms: executionTime
-    });
-  }
-  
-  // Single transformation
-  const params = { limit, length, type };
-  const result = await executeTransform(text, action, params);
-  const executionTime = Date.now() - startTime;
-  
-  if (!result) {
-    return res.status(400).json({
-      success: false,
-      error: `Invalid action: ${action}`,
-      status: 400
-    });
-  }
-  
-  if (result.error) {
-    return res.status(500).json({
-      success: false,
-      error: result.error,
-      status: result.status
-    });
-  }
-  
-  if (webhook) {
-    sendWebhook(webhook, {
-      original: text,
-      action,
-      result: result.result,
-      execution_time_ms: executionTime
-    });
-  }
-  
-  res.json({
-    success: true,
-    original: text,
-    action,
-    result: result.result,
-    execution_time_ms: executionTime
-  });
+  return processTransformRequest(
+    { text, action, actions, preview: preview === true || preview === 'true', preset, limit, length, type, webhook },
+    res
+  );
 });
 
 /**
@@ -889,16 +725,19 @@ async function startServer() {
   startCleanup();
   
   // Start Express server
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     logger.info(`TextForge API listening on port ${PORT}`, { env: NODE_ENV });
+  });
+  return server;
+}
+
+// Only auto-start the server when this file is the entry point (not when required by tests)
+if (require.main === module) {
+  startServer().catch((err) => {
+    logger.error('Failed to start server', err);
+    process.exit(1);
   });
 }
 
-// Start the server
-startServer().catch((err) => {
-  logger.error('Failed to start server', err);
-  process.exit(1);
-});
-
 // Export for testing
-module.exports = { app };
+module.exports = { app, startServer };

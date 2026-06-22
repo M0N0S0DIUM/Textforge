@@ -96,6 +96,53 @@ The dashboard will be available at `http://localhost:3001` (or whatever port Nex
 
 Shared rate limiting uses Redis when `REDIS_URL` is configured. If Redis is unset or unavailable, TextForge logs a warning and falls back to per-instance in-memory counters, which are only appropriate for local development or single-instance deployments.
 
+## Production Deployment Notes
+
+### Required settings
+
+```bash
+NODE_ENV=production
+API_KEY_SECRET="<strong random secret – never commit this>"
+```
+
+### Redis (recommended for production)
+
+Set `REDIS_URL` to enable shared rate limiting and caching across instances.  Without it TextForge falls back to per-process in-memory stores, meaning rate limit counters reset on restart and are not shared across replicas.
+
+On startup TextForge logs one of three messages to help diagnose Redis connectivity:
+
+| Log message | Meaning |
+|-------------|---------|
+| `Rate limiter: REDIS_URL is not configured; using in-memory mode` | `REDIS_URL` env var is unset |
+| `Rate limiter: Redis configured but unavailable; falling back to in-memory mode` | `REDIS_URL` is set but the server is unreachable at startup |
+| `Rate limiter: Redis connection lost; falling back to in-memory mode` | Redis was reachable but dropped the connection mid-operation |
+
+### Database migrations
+
+`db.js` runs versioned migrations automatically at startup using a `schema_migrations` tracking table.  Migrations are idempotent – restarting the process (or deploying a new version) never crashes due to "column already exists" errors.  Add new migrations by appending entries to the `MIGRATIONS` array in `db.js`.
+
+### Secrets management checklist
+
+- [ ] `API_KEY_SECRET` is set in your environment and **never** committed to source control
+- [ ] `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are configured for production Stripe keys
+- [ ] `.env` is listed in `.gitignore` (it is by default)
+- [ ] Run `npm audit` periodically to check for vulnerable dependencies
+
+### Logging
+
+TextForge uses a built-in structured logger (`logger.js`).  Log level defaults to `error` in production and `info` in development.  Override with `LOG_LEVEL=debug|info|warn|error`.
+
+## Running Tests
+
+```bash
+API_KEY_SECRET=test npm test
+```
+
+Tests run with Node.js built-in test runner (`node:test`).  The suite includes:
+
+- **Unit tests** – all 23 transformation functions with edge cases (empty strings, special characters, chaining, batching)
+- **Integration tests** – GET/POST `/transform` parity, validation behaviour, chaining, preview, and presets
+
 ## API Documentation
 
 ### Base URL
