@@ -49,7 +49,7 @@ export default function Docs() {
   const [activeTab, setActiveTab] = useState('overview');
   const [copied, setCopied] = useState(false);
 
-  const exampleCode = `curl -X GET "https://api.textforge.co/transform?text=Hello%20World!&action=slugify"`;
+  const exampleCode = `curl -X GET "https://textforge.co/transform?text=Hello%20World!&action=slugify"`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(exampleCode);
@@ -131,21 +131,21 @@ export default function Docs() {
               </p>
 
               <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">Base URL</h2>
-              <div className="code-block mb-8">
-                <code>https://api.textforge.co</code>
+              <div className="code-block mb-8" style={{ backgroundColor: '#1e1e1e', borderRadius: '8px', padding: '16px', overflow: 'auto' }}>
+                <code style={{ color: '#d4d4d4', fontFamily: 'monospace', fontSize: '14px' }}>https://textforge.co</code>
               </div>
 
               <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">Quick Start</h2>
-              <div className="code-block mb-8 relative">
-                <button onClick={handleCopy} className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white">
+              <div className="code-block mb-8 relative" style={{ backgroundColor: '#1e1e1e', borderRadius: '8px', padding: '16px', overflow: 'auto', position: 'relative' }}>
+                <button onClick={handleCopy} className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white" style={{ zIndex: 1 }}>
                   {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                 </button>
-                <pre className="text-gray-300">{exampleCode}</pre>
+                <pre style={{ color: '#d4d4d4', margin: 0, fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.5' }}>{exampleCode}</pre>
               </div>
 
               <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">Response Format</h2>
-              <div className="code-block mb-8">
-                <pre className="text-gray-300">{`{
+              <div className="code-block mb-8" style={{ backgroundColor: '#1e1e1e', borderRadius: '8px', padding: '16px', overflow: 'auto' }}>
+                <pre style={{ color: '#d4d4d4', margin: 0, fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.5' }}>{`{
   "success": true,
   "original": "Hello World!",
   "action": "slugify",
@@ -173,9 +173,9 @@ export default function Docs() {
             </p>
 
             <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">Usage</h2>
-            <div className="code-block mb-8">
-              <pre className="text-gray-300">{`curl -H "X-API-Key: tf_pro_0123456789abcdef0123456789abcdef" \\
-  "https://api.textforge.co/transform?text=Hello&action=slugify"`}</pre>
+            <div className="code-block mb-8" style={{ backgroundColor: '#1e1e1e', borderRadius: '8px', padding: '16px', overflow: 'auto' }}>
+              <pre style={{ color: '#d4d4d4', margin: 0, fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.5' }}>{`curl -H "X-API-Key: tf_pro_0123456789abcdef0123456789abcdef" \\
+  "https://textforge.co/transform?text=Hello&action=slugify"`}</pre>
             </div>
           </div>
         )}
