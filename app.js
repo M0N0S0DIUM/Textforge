@@ -474,7 +474,6 @@ app.get('/stats', (req, res) => {
     }
   });
 });
-});
 
 // ============================================
 // Dashboard Routes (served from Next.js build)
