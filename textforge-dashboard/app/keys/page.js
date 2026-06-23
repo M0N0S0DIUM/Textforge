@@ -12,16 +12,24 @@ export default function Keys() {
   const [message, setMessage] = useState(null);
   const [userTier, setUserTier] = useState('Free');  // Track user's tier
 
-  // Fetch API keys
+  // Fetch API keys (only if we have an API key)
   useEffect(() => {
+    if (!apiKey) {
+      setLoading(false);
+      setUserTier('Free');
+      return;
+    }
+
     const fetchKeys = async () => {
       try {
         const response = await fetch(`${API_URL}/api/keys`, {
-          headers: { 'X-API-Key': apiKey }  // Add auth header
+          headers: { 'X-API-Key': apiKey }
         });
         const data = await response.json();
         if (data.success) {
           setKeys(data.keys);
+        } else {
+          setMessage({ type: 'error', text: data.error || 'Failed to fetch API keys.' });
         }
       } catch (err) {
         setMessage({ type: 'error', text: 'Failed to fetch API keys.' });
@@ -31,14 +39,13 @@ export default function Keys() {
     };
 
     fetchKeys();
-  }, [apiKey]);  // Re-fetch when apiKey changes
+  }, [apiKey]);
 
-  // Determine user tier from keys
+  // Determine user tier from keys or API key format
   useEffect(() => {
     if (keys.length > 0) {
       setUserTier(keys[0].tier === 'pro' ? 'Pro' : 'Free');
     } else if (apiKey) {
-      // If we have an API key but no keys returned, check the key format
       setUserTier(apiKey.startsWith('tf_pro_') ? 'Pro' : 'Free');
     }
   }, [keys, apiKey]);
