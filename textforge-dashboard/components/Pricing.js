@@ -14,7 +14,7 @@ const plans = [
   },
   {
     name: 'Pro',
-    price: '$29',
+    price: '$2.99',
     period: '/month',
     description: 'For production applications',
     features: ['50,000 requests/day', 'Priority support', 'Webhook delivery', 'Custom presets', 'Analytics'],
@@ -32,7 +32,7 @@ export default function Pricing() {
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Simple, Transparent Pricing</h2>
           <p className="text-xl text-gray-600">Start free. Upgrade when you need more.</p>
         </div>
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
           {plans.map((plan) => (
             <div
               key={plan.name}

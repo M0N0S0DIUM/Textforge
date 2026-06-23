@@ -13,7 +13,7 @@ const plans = [
   },
   {
     name: 'Pro',
-    price: '$29',
+    price: '$2.99',
     description: 'For production applications',
     features: ['50,000 requests/day', 'Priority support', 'Webhook delivery', 'Custom presets', 'Analytics'],
     cta: 'Upgrade to Pro',
@@ -113,7 +113,7 @@ export default function Billing() {
         </div>
       )}
 
-      <div className="grid md:grid-cols-3 gap-8 mb-12">
+      <div className="grid md:grid-cols-2 gap-8 mb-12 max-w-3xl mx-auto">
         {plans.map((plan) => (
           <div key={plan.name} className={`card relative ${plan.current ? 'border-primary-500 ring-2 ring-primary-500' : ''}`}>
             {plan.current && (
