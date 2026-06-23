@@ -46,7 +46,7 @@ async function initRedis() {
     });
     
     await redisClient.connect();
-    __redisAvailable = true;
+    _redisAvailable = true;
     return true;
   } catch (err) {
     _redisAvailable = false;

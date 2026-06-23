@@ -36,7 +36,8 @@ const {
   validateText, getAvailableActions, getTransformFunction, PRESETS
 } = require('./transformations');
 const swaggerUi = require('swagger-ui-express');
-const openapiSpec = require('./openapi.yaml');
+const yaml = require('yaml');
+const openapiSpec = yaml.parse(require('fs').readFileSync('./openapi.yaml', 'utf8'));
 
 const {
   rateLimiterMiddleware,
