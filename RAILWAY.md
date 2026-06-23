@@ -151,6 +151,21 @@ PostgreSQL is the **recommended database** for production. It provides:
 - Easier scaling
 - Railway auto-manages connections
 
+#### ⚠️ Important: Only 1 PostgreSQL Service Needed
+
+If you see multiple PostgreSQL services in your Railway dashboard, **delete all but one**:
+
+1. Go to [railway.app](https://railway.app) → Your Project → Services
+2. Look for any duplicate PostgreSQL databases (may be named `postgres`, `postgresql`, or similar)
+3. For each duplicate service:
+   - Click on the service
+   - Go to **Settings** → **Danger Zone**
+   - Click **Delete Service**
+4. Keep only ONE PostgreSQL service and ONE Redis service
+5. The remaining services should automatically share environment variables
+
+After cleanup, verify your `DATABASE_URL` variable points to your single database.
+
 ## Monitoring & Logs
 
 View logs in Railway:
