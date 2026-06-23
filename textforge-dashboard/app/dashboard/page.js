@@ -13,22 +13,26 @@ export default function Dashboard() {
   const [keys, setKeys] = useState([]);
   const [plan, setPlan] = useState('Free');
 
-  // Fetch stats from API
+  // Fetch stats from API (per-user analytics)
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch(`${API_URL}/stats`);
+        const response = await fetch(`${API_URL}/api/analytics/usage`, {
+          headers: { 'X-API-Key': apiKey }
+        });
         const data = await response.json();
         if (data.success) {
-          setStats(data.stats);
+          setStats(data.usage);
         }
       } catch (err) {
         console.error('Failed to fetch stats:', err);
       }
     };
 
-    fetchStats();
-  }, []);
+    if (apiKey) {
+      fetchStats();
+    }
+  }, [apiKey]);
 
   // Fetch API keys
   useEffect(() => {
@@ -95,7 +99,9 @@ export default function Dashboard() {
     }
   };
 
-  const usagePercent = stats ? Math.min((stats.totalRequests / 50000) * 100, 100) : 0;
+  const dailyLimit = plan === 'Pro' ? 50000 : 1000;
+  const requestsToday = stats?.today?.requests_today || 0;
+  const usagePercent = Math.min((requestsToday / dailyLimit) * 100, 100);
 
   if (loading) {
     return (
@@ -130,12 +136,12 @@ export default function Dashboard() {
         </div>
         <div className="card">
           <div className="text-sm text-gray-500 mb-1">Requests Today</div>
-          <div className="text-2xl font-bold text-gray-900">{stats ? stats.totalRequests.toLocaleString() : '0'}</div>
+          <div className="text-2xl font-bold text-gray-900">{stats?.today?.requests_today?.toLocaleString() || '0'}</div>
         </div>
         <div className="card">
           <div className="text-sm text-gray-500 mb-1">Plan</div>
           <div className="text-2xl font-bold text-primary-600">{plan}</div>
-          <div className="text-sm text-gray-500">{plan === 'Pro' ? 'Upgrade for more' : 'Upgrade for more'}</div>
+          <div className="text-sm text-gray-500">{plan === 'Pro' ? '50,000 requests/day' : '1,000 requests/day'}</div>
         </div>
       </div>
 
@@ -143,7 +149,7 @@ export default function Dashboard() {
       <div className="card mb-8">
         <div className="flex justify-between mb-2">
           <span className="text-sm text-gray-600">Daily Usage</span>
-          <span className="text-sm text-gray-600">{stats ? stats.totalRequests.toLocaleString() : '0'} / 50,000</span>
+          <span className="text-sm text-gray-600">{stats?.today?.requests_today?.toLocaleString() || '0'} / {dailyLimit.toLocaleString()}</span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
           <div

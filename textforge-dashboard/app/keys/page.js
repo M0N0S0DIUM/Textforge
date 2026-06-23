@@ -10,12 +10,15 @@ export default function Keys() {
   const [loading, setLoading] = useState(true);
   const [copiedKey, setCopiedKey] = useState(null);
   const [message, setMessage] = useState(null);
+  const [userTier, setUserTier] = useState('Free');  // Track user's tier
 
   // Fetch API keys
   useEffect(() => {
     const fetchKeys = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/keys`);
+        const response = await fetch(`${API_URL}/api/keys`, {
+          headers: { 'X-API-Key': apiKey }  // Add auth header
+        });
         const data = await response.json();
         if (data.success) {
           setKeys(data.keys);
@@ -28,7 +31,17 @@ export default function Keys() {
     };
 
     fetchKeys();
-  }, []);
+  }, [apiKey]);  // Re-fetch when apiKey changes
+
+  // Determine user tier from keys
+  useEffect(() => {
+    if (keys.length > 0) {
+      setUserTier(keys[0].tier === 'pro' ? 'Pro' : 'Free');
+    } else if (apiKey) {
+      // If we have an API key but no keys returned, check the key format
+      setUserTier(apiKey.startsWith('tf_pro_') ? 'Pro' : 'Free');
+    }
+  }, [keys, apiKey]);
 
   const handleCopy = (key) => {
     navigator.clipboard.writeText(key);
@@ -42,7 +55,13 @@ export default function Keys() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/keys`, { method: 'POST' });
+      const response = await fetch(`${API_URL}/api/keys`, { 
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey 
+        }
+      });
       const data = await response.json();
       if (data.success && data.key) {
         setKeys([data.key, ...keys]);
@@ -61,7 +80,10 @@ export default function Keys() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/keys/${keyId}`, { method: 'DELETE' });
+      const response = await fetch(`${API_URL}/api/keys/${keyId}`, { 
+        method: 'DELETE',
+        headers: { 'X-API-Key': apiKey }
+      });
       const data = await response.json();
       if (data.success) {
         setKeys(keys.filter((k) => k.id !== keyId));
@@ -98,22 +120,42 @@ export default function Keys() {
         </div>
       )}
 
-      {/* Generate New Key */}
-      <div className="card mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Generate New Key</h2>
-            <p className="text-gray-600 mt-1">Create a new Pro API key for your applications.</p>
+      {/* Generate New Key - Pro Only */}
+      {userTier === 'Pro' && (
+        <div className="card mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Generate New Key</h2>
+              <p className="text-gray-600 mt-1">Create a new Pro API key for your applications.</p>
+            </div>
+            <button
+              onClick={handleRegenerate}
+              className="btn-primary flex items-center"
+            >
+              <Key className="w-4 h-4 mr-2" />
+              Generate Key
+            </button>
           </div>
-          <button
-            onClick={handleRegenerate}
-            className="btn-primary flex items-center"
-          >
-            <Key className="w-4 h-4 mr-2" />
-            Generate Key
-          </button>
         </div>
-      </div>
+      )}
+
+      {/* Free Tier Notice */}
+      {userTier === 'Free' && (
+        <div className="card mb-8 bg-blue-50 border-blue-200">
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <h2 className="text-xl font-semibold text-blue-900">Free Tier</h2>
+              <p className="text-blue-700 mt-1">
+                Free tier users don't need an API key. You can make up to 1,000 requests/day without authentication.
+                <br />
+                <a href="/billing" className="text-primary-600 hover:underline font-medium mt-2 inline-block">
+                  Upgrade to Pro for 50,000 requests/day & API keys →
+                </a>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* API Keys List */}
       <div className="card">
