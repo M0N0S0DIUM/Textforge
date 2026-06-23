@@ -46,7 +46,8 @@ const {
   startCleanup,
   initRateLimiter
 } = require('./rateLimiter');
-const { initRedis, get: cacheGet, set: cacheSet, clear: cacheClear, generateCacheKey, getStats: getCacheStats, redisAvailable: cacheRedisAvailable } = require('./cache');
+const cache = require('./cache');
+const { initRedis, get: cacheGet, set: cacheSet, clear: cacheClear, generateCacheKey, getStats: getCacheStats } = cache;
 
 // Initialize Express app
 const app = express();
@@ -462,52 +463,52 @@ app.get('/', (req, res) => {
  * GET /health - Health check endpoint
  * Returns API status, database status, Redis connectivity, and uptime
  */
-app.get('/health', async (req, res) => {
-  const uptime = Math.floor((Date.now() - stats.startTime) / 1000);
-  const cacheStats = getCacheStats();
-  
-  // Use the imported cacheRedisAvailable (already available from line 47)
-  
-  let redisStatus = cacheRedisAvailable ? 'connected' : 'not_configured';
+ app.get('/health', async (req, res) => {
+   const uptime = Math.floor((Date.now() - stats.startTime) / 1000);
+   const cacheStats = getCacheStats();
 
-  // Quick database liveness probe
-  let dbStatus = 'healthy';
-  try {
-    await db.get('SELECT 1');
-  } catch (err) {
-    dbStatus = 'unhealthy';
-    logger.error('Database health check failed', { error: err.message });
-  }
+   // Use live cache.redisAvailable getter
+   const redisAvailable = cache.redisAvailable;
+   let redisStatus = redisAvailable ? 'connected' : 'not_configured';
 
-  // Check if all migrations are applied
-  let migrationsStatus = 'completed';
-  try {
-    const result = await db.query('SELECT COUNT(*) as count FROM schema_migrations');
-    if (result.rows.length === 0) {
-      migrationsStatus = 'not_started';
-    }
-  } catch (err) {
-    migrationsStatus = 'error';
-    logger.warn('Migration status check failed', { error: err.message });
-  }
+   // Quick database liveness probe
+   let dbStatus = 'healthy';
+   try {
+     await db.get('SELECT 1');
+   } catch (err) {
+     dbStatus = 'unhealthy';
+     logger.error('Database health check failed', { error: err.message });
+   }
 
-  const status = (dbStatus === 'healthy' && redisStatus !== 'unhealthy') ? 'healthy' : 'degraded';
+   // Check if all migrations are applied
+   let migrationsStatus = 'completed';
+   try {
+     const result = await db.query('SELECT COUNT(*) as count FROM schema_migrations');
+     if (result.rows.length === 0) {
+       migrationsStatus = 'not_started';
+     }
+   } catch (err) {
+     migrationsStatus = 'error';
+     logger.warn('Migration status check failed', { error: err.message });
+   }
 
-  res.status(status === 'healthy' ? 200 : 503).json({
-    success: status === 'healthy',
-    status,
-    uptime_seconds: uptime,
-    database: dbStatus,
-    redis: redisStatus,
-    migrations: migrationsStatus,
-    cache: {
-      ...cacheStats,
-      backend: cacheRedisAvailable ? 'redis' : 'memory'
-    },
-    version: '1.0.0',
-    requestId: req.id
-  });
-});
+   const status = (dbStatus === 'healthy' && redisStatus !== 'unhealthy') ? 'healthy' : 'degraded';
+
+   res.status(status === 'healthy' ? 200 : 503).json({
+     success: status === 'healthy',
+     status,
+     uptime_seconds: uptime,
+     database: dbStatus,
+     redis: redisStatus,
+     migrations: migrationsStatus,
+     cache: {
+       ...cacheStats,
+       backend: redisAvailable ? 'redis' : 'memory'
+     },
+     version: '1.0.0',
+     requestId: req.id
+   });
+ });
 
 /**
  * GET /stats - API statistics endpoint
