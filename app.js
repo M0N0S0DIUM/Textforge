@@ -477,7 +477,7 @@ app.get('/stats', (req, res) => {
 });
 
 // ============================================
-// Dashboard Routes (served from Next.js build)
+// Dashboard Routes (served from Next.js static build)
 // ============================================
 const fs = require('fs');
 // path already imported at line 25
@@ -485,34 +485,38 @@ const fs = require('fs');
 // Serve dashboard pages if built
 const dashboardDir = path.join(__dirname, 'textforge-dashboard', '.next', 'server', 'app');
 
-if (fs.existsSync(dashboardDir)) {
-  // Serve root as dashboard index
-  app.get('/dashboard', (req, res) => {
-    try {
-      const htmlPath = path.join(dashboardDir, 'dashboard', 'page.js');
-      if (fs.existsSync(htmlPath)) {
-        // For simplicity, redirect to API docs if dashboard not fully built
-        return res.redirect('/api-docs');
-      }
-    } catch (err) {
-      logger.warn('Dashboard route error:', { error: err.message });
-    }
-    res.status(404).json({ success: false, error: 'Dashboard not available', status: 404 });
-  });
-} else {
-  // Dashboard not built yet - redirect to API docs
-  app.get('/dashboard', (req, res) => {
-    res.redirect('/api-docs');
-  });
+function serveDashboardPage(req, res, pageName) {
+  const htmlPath = path.join(dashboardDir, `${pageName}.html`);
+  if (fs.existsSync(htmlPath)) {
+    res.setHeader('Content-Type', 'text/html');
+    return res.status(200).sendFile(htmlPath);
+  }
+  // Fallback if dashboard not built
+  return res.redirect('/api-docs');
 }
 
-app.get('/billing', (req, res) => {
-  res.redirect('/api-docs');
-});
+if (fs.existsSync(dashboardDir)) {
+  // Serve dashboard index
+  app.get('/dashboard', (req, res) => serveDashboardPage(req, res, 'dashboard'));
+  // Serve billing page
+  app.get('/billing', (req, res) => serveDashboardPage(req, res, 'billing'));
+  // Serve keys page
+  app.get('/keys', (req, res) => serveDashboardPage(req, res, 'keys'));
+  // Serve docs page
+  app.get('/docs', (req, res) => serveDashboardPage(req, res, 'docs'));
+} else {
+  // Dashboard not built yet - redirect to API docs
+  app.get('/dashboard', (req, res) => res.redirect('/api-docs'));
+  app.get('/billing', (req, res) => res.redirect('/api-docs'));
+  app.get('/keys', (req, res) => res.redirect('/api-docs'));
+  app.get('/docs', (req, res) => res.redirect('/api-docs'));
+}
 
-app.get('/keys', (req, res) => {
-  res.redirect('/api-docs');
-});
+// Also serve Next.js static assets
+const staticDir = path.join(__dirname, 'textforge-dashboard', '.next', 'static');
+if (fs.existsSync(staticDir)) {
+  app.use('/_next/static', express.static(staticDir));
+}
 
 /**
  * Shared transform request handler used by both GET and POST /transform.
