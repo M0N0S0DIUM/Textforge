@@ -328,10 +328,75 @@ app.use('/admin', adminRouter);
 // Routes
 // ============================================
 
-/**
- * GET /health - Health check endpoint
- * Returns API status, database status, Redis connectivity, and uptime
- */
+// Root route - HTML landing page for browser users
+app.get('/', (req, res) => {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TextForge - Smart Text Utility API</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      line-height: 1.6;
+      color: #333;
+    }
+    h1 { color: #1a73e8; }
+    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 40px 0; }
+    .feature { padding: 20px; border-radius: 8px; background: #f5f5f5; }
+    a { color: #1a73e8; text-decoration: none; font-weight: bold; }
+    a:hover { text-decoration: underline; }
+    .code-example {
+      background: #2d2d2d;
+      color: #f8f8f2;
+      padding: 20px;
+      border-radius: 8px;
+      font-family: monospace;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>TextForge - Smart Text Utility API</h1>
+  <p>A lightweight REST API providing <strong>23 text transformation utilities</strong> through a single, simple endpoint.</p>
+  
+  <div class="features">
+    <div class="feature">
+      <h3>🚀 Fast Performance</h3>
+      <p>Sub-5ms response times for each transformation</p>
+    </div>
+    <div class="feature">
+      <h3>🔗 Chained Operations</h3>
+      <p>Combine multiple transformations in one request</p>
+    </div>
+    <div class="feature">
+      <h3>🔒 Rate Limiting</h3>
+      <p>Built-in protection with generous free tier</p>
+    </div>
+  </div>
+
+  <h2>Available Endpoints</h2>
+  <ul>
+    <li><a href="/health">GET /health</a> - Health check</li>
+    <li><a href="/transform?text=Hello%20World&action=slugify">GET /transform</a> - Single transformation</li>
+    <li><a href="/batch">POST /batch</a> - Batch processing</li>
+    <li><a href="/stats">GET /stats</a> - API statistics</li>
+  </ul>
+
+  <h2>Quick Example</h2>
+  <div class="code-example">curl "https://textforge.co/transform?text=Hello%20World!&action=slugify"</div>
+
+  <p><a href="/api-docs">View API Documentation</a></p>
+</body>
+</html>`;
+  res.setHeader('Content-Type', 'text/html');
+  res.status(200).send(html);
+});
+
 /**
  * GET /health - Health check endpoint
  * Returns API status, database status, Redis connectivity, and uptime
@@ -408,6 +473,45 @@ app.get('/stats', (req, res) => {
       uptime_seconds: Math.floor((Date.now() - stats.startTime) / 1000)
     }
   });
+});
+});
+
+// ============================================
+// Dashboard Routes (served from Next.js build)
+// ============================================
+const fs = require('fs');
+const path = require('path');
+
+// Serve dashboard pages if built
+const dashboardDir = path.join(__dirname, 'textforge-dashboard', '.next', 'server', 'app');
+
+if (fs.existsSync(dashboardDir)) {
+  // Serve root as dashboard index
+  app.get('/dashboard', (req, res) => {
+    try {
+      const htmlPath = path.join(dashboardDir, 'dashboard', 'page.js');
+      if (fs.existsSync(htmlPath)) {
+        // For simplicity, redirect to API docs if dashboard not fully built
+        return res.redirect('/api-docs');
+      }
+    } catch (err) {
+      logger.warn('Dashboard route error:', { error: err.message });
+    }
+    res.status(404).json({ success: false, error: 'Dashboard not available', status: 404 });
+  });
+} else {
+  // Dashboard not built yet - redirect to API docs
+  app.get('/dashboard', (req, res) => {
+    res.redirect('/api-docs');
+  });
+}
+
+app.get('/billing', (req, res) => {
+  res.redirect('/api-docs');
+});
+
+app.get('/keys', (req, res) => {
+  res.redirect('/api-docs');
 });
 
 /**
