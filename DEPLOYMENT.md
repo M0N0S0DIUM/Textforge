@@ -53,11 +53,11 @@ Copy `.env.example` as a reference for all available variables.
 ## 4. Set Up Stripe Webhooks
 
 1. In the [Stripe Dashboard](https://dashboard.stripe.com/webhooks) click **Add endpoint**.
-2. Set the URL to:
+4. Set the URL to:
    ```
    https://your-app.up.railway.app/api/webhooks/stripe
    ```
-3. Select these events to listen to:
+5. Select these events to listen to:
    - `checkout.session.completed`
    - `customer.subscription.created`
    - `customer.subscription.updated`
@@ -66,7 +66,7 @@ Copy `.env.example` as a reference for all available variables.
    - `invoice.finalized`
    - `invoice.paid`
    - `invoice.payment_failed`
-4. Copy the **Signing secret** and set it as `STRIPE_WEBHOOK_SECRET` in Railway.
+6. Copy the **Signing secret** and set it as `STRIPE_WEBHOOK_SECRET` in Railway.
 
 ---
 
