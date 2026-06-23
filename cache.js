@@ -186,7 +186,7 @@ function getStats() {
  * @returns {boolean} Whether any caching backend is available
  */
 function isAvailable() {
-  return redisAvailable || memoryCache.size > 0;
+  return _redisAvailable || memoryCache.size > 0;
 }
 
 module.exports = {

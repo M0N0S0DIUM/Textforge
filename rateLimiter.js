@@ -338,8 +338,7 @@ async function resetRateLimit(key) {
   }
 }
 
-// Make redisAvailable accessible from outside
-let _redisAvailable = false;
+// Make redisAvailable accessible from outside (already declared at line 26)
 module.exports = {
   API_KEY_PREFIX,
   initRateLimiter,

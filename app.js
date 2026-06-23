@@ -339,8 +339,7 @@ app.get('/health', async (req, res) => {
   const uptime = Math.floor((Date.now() - stats.startTime) / 1000);
   const cacheStats = getCacheStats();
   
-  // Get Redis health status from cache module
-  const cacheRedisAvailable = cacheRedisAvailable;
+  // Use the imported cacheRedisAvailable (already available from line 47)
   
   let redisStatus = cacheRedisAvailable ? 'connected' : 'not_configured';
 
@@ -425,7 +424,7 @@ app.get('/stats', (req, res) => {
  * @param {string}  [p.webhook]   - Webhook URL for async result delivery
  * @param {object}  res           - Express response object
  */
-async function processTransformRequest({ text, action, actions, preview, preset, limit, length, type, webhook }, res) {
+async function processTransformRequest(req, { text, action, actions, preview, preset, limit, length, type, webhook }, res) {
   // Validate required parameters
   if (!text) {
     return res.status(400).json({
@@ -607,7 +606,7 @@ app.get('/transform', async (req, res) => {
   // Normalize comma-separated actions string → array
   const rawActions = toStr(req.query.actions);
   const actions = rawActions ? rawActions.split(',').map(a => a.trim()).filter(Boolean) : undefined;
-  return processTransformRequest(
+  return processTransformRequest(req,
     { text, action, actions, preview, preset, limit, length, type, webhook },
     res
   );
@@ -646,7 +645,7 @@ app.post('/transform', async (req, res) => {
   } else {
     actions = undefined;
   }
-  return processTransformRequest(
+  return processTransformRequest(req,
     { text, action, actions, preview, preset, limit, length, type, webhook },
     res
   );
@@ -836,6 +835,7 @@ async function startServer() {
     logger.info(`TextForge API listening on port ${PORT}`, { env: NODE_ENV });
   });
   return server;
+}
 
 // Only auto-start the server when this file is the entry point (not when required by tests)
 if (require.main === module) {
