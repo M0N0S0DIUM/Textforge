@@ -245,5 +245,6 @@ module.exports = {
   prepare,
   init,
   close,
-  pool
+  pool,
+  runMigrations
 };

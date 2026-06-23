@@ -24,6 +24,7 @@
 const express = require('express');
 const path = require('path');
 const db = require('./db');
+const { runMigrations } = require('./db');
 const logger = require('./logger');
 
 // Import modules
@@ -929,11 +930,21 @@ async function startServer() {
     logger.warn('Redis initialization error', { error: err.message });
   }
 
+  // Initialize database and run migrations
+  try {
+    await db.init();
+    await runMigrations();
+    logger.info('Database initialized and migrations applied');
+  } catch (err) {
+    logger.error('Database initialization failed', { error: err.message });
+    throw err;
+  }
+
   await initRateLimiter();
-  
+
   // Start automatic cleanup for rate limiter
   startCleanup();
-  
+
   // Start Express server and store reference for graceful shutdown
   server = app.listen(PORT, () => {
     logger.info(`TextForge API listening on port ${PORT}`, { env: NODE_ENV });
