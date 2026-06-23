@@ -85,6 +85,73 @@ const MIGRATIONS = [
         applied_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `
+  },
+  {
+    version: 2,
+    name: 'create_user_presets',
+    sql: `
+      CREATE TABLE IF NOT EXISTS user_presets (
+        id SERIAL PRIMARY KEY,
+        customer_id TEXT NOT NULL REFERENCES customers(stripe_customer_id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        actions JSONB NOT NULL,
+        description TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(customer_id, name)
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_user_presets_customer_id ON user_presets(customer_id);
+    `
+  },
+  {
+    version: 3,
+    name: 'create_request_logs',
+    sql: `
+      CREATE TABLE IF NOT EXISTS request_logs (
+        id BIGSERIAL PRIMARY KEY,
+        api_key_hash TEXT NOT NULL,
+        action TEXT NOT NULL,
+        actions JSONB,
+        status_code INTEGER NOT NULL,
+        latency_ms INTEGER NOT NULL,
+        request_size_bytes INTEGER,
+        response_size_bytes INTEGER,
+        ip_hash TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_request_logs_api_key_hash ON request_logs(api_key_hash);
+      CREATE INDEX IF NOT EXISTS idx_request_logs_created_at ON request_logs(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_request_logs_action ON request_logs(action);
+      
+      -- Partition by month for performance (optional, can add later)
+      -- CREATE INDEX IF NOT EXISTS idx_request_logs_monthly ON request_logs(date_trunc('month', created_at));
+    `
+  },
+  {
+    version: 4,
+    name: 'create_daily_analytics_rollup',
+    sql: `
+      CREATE TABLE IF NOT EXISTS daily_analytics (
+        id SERIAL PRIMARY KEY,
+        api_key_hash TEXT NOT NULL,
+        date DATE NOT NULL,
+        total_requests INTEGER DEFAULT 0,
+        total_transformations INTEGER DEFAULT 0,
+        total_latency_ms BIGINT DEFAULT 0,
+        total_request_bytes BIGINT DEFAULT 0,
+        total_response_bytes BIGINT DEFAULT 0,
+        errors INTEGER DEFAULT 0,
+        action_breakdown JSONB DEFAULT '{}',
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(api_key_hash, date)
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_daily_analytics_api_key_hash ON daily_analytics(api_key_hash);
+      CREATE INDEX IF NOT EXISTS idx_daily_analytics_date ON daily_analytics(date DESC);
+    `
   }
 ];
 

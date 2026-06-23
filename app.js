@@ -317,9 +317,69 @@ async function sendWebhook(webhookUrl, data) {
   }
 }
 
+const crypto = require('crypto');
+
+/**
+ * Log request to request_logs table for analytics
+ * @param {Request} req - Express request object
+ * @param {object} params - Request parameters
+ * @param {number} statusCode - HTTP status code
+ * @param {number} latencyMs - Execution time in ms
+ * @param {string|null} action - Single action (if applicable)
+ * @param {string[]} actions - Array of actions for chaining
+ * @param {number} requestSize - Request body size in bytes
+ * @param {number} responseSize - Response body size in bytes
+ */
+async function logRequest(req, { action, actions, text }, statusCode, latencyMs, requestSize, responseSize) {
+  try {
+    // Get API key hash from header
+    const apiKey = req.headers['x-api-key'];
+    let apiKeyHash = null;
+    
+    if (apiKey) {
+      const { hashApiKey } = require('./apiKeys');
+      apiKeyHash = hashApiKey(apiKey);
+    }
+
+    // Hash IP for privacy
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    const ipHash = crypto.createHash('sha256').update(ip).digest('hex').substring(0, 16);
+
+    // Determine primary action for logging
+    const primaryAction = action || (actions && actions.length > 0 ? actions[0] : 'preview');
+
+    await db.query(
+      `INSERT INTO request_logs 
+       (api_key_hash, action, actions, status_code, latency_ms, request_size_bytes, response_size_bytes, ip_hash)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        apiKeyHash,
+        primaryAction,
+        actions ? JSON.stringify(actions) : null,
+        statusCode,
+        latencyMs,
+        requestSize,
+        responseSize,
+        ipHash
+      ]
+    );
+  } catch (err) {
+    // Don't fail the request if logging fails
+    logger.warn('Request logging failed', { error: err.message });
+  }
+}
+
 // Stripe / billing routes (must be mounted before the global JSON parser affects raw bodies)
 const stripeRouter = require('./routes/stripe');
 app.use('/api', stripeRouter);
+
+// Presets routes
+const presetsRouter = require('./routes/presets');
+app.use('/api', presetsRouter);
+
+// Analytics routes
+const analyticsRouter = require('./routes/analytics').router;
+app.use('/api', analyticsRouter);
 
 // Admin routes (testing/development only)
 const adminRouter = require('./routes/admin');
@@ -534,8 +594,11 @@ if (fs.existsSync(staticDir)) {
  * @param {object}  res           - Express response object
  */
 async function processTransformRequest(req, { text, action, actions, preview, preset, limit, length, type, webhook }, res) {
+  const startTime = Date.now();
   // Validate required parameters
   if (!text) {
+    const executionTime = Date.now() - startTime;
+    await logRequest(req, { action: null, actions: null, text: '' }, 400, executionTime, 0, 0);
     return res.status(400).json({
       success: false,
       error: 'Missing required parameter: text',
@@ -544,6 +607,8 @@ async function processTransformRequest(req, { text, action, actions, preview, pr
   }
 
   if (!action && !actions && !preview && !preset) {
+    const executionTime = Date.now() - startTime;
+    await logRequest(req, { action: null, actions: null, text: '' }, 400, executionTime, 0, 0);
     return res.status(400).json({
       success: false,
       error: 'Missing required parameter: action, actions, preview, or preset',
@@ -554,14 +619,14 @@ async function processTransformRequest(req, { text, action, actions, preview, pr
   // Validate text length
   const validation = validateText(text);
   if (!validation.valid) {
+    const executionTime = Date.now() - startTime;
+    await logRequest(req, { action: null, actions: null, text: text.substring(0, 100) }, 400, executionTime, text.length, 0);
     return res.status(400).json({
       success: false,
       error: validation.error,
       status: 400
     });
   }
-
-  const startTime = Date.now();
 
   // Handle preview mode - return all transformations
   if (preview) {
@@ -573,12 +638,15 @@ async function processTransformRequest(req, { text, action, actions, preview, pr
       sendWebhook(webhook, { original: text, transformations, execution_time_ms: executionTime });
     }
 
-    return res.json({
+    const responseBody = {
       success: true,
       original: text,
       transformations,
       execution_time_ms: executionTime
-    });
+    };
+    await logRequest(req, { action: 'preview', actions: null, text }, 200, executionTime, text.length, JSON.stringify(responseBody).length);
+
+    return res.json(responseBody);
   }
 
   // Handle presets
@@ -589,6 +657,7 @@ async function processTransformRequest(req, { text, action, actions, preview, pr
     const executionTime = Date.now() - startTime;
 
     if (result.error) {
+      await logRequest(req, { action: preset, actions: presetActions, text }, 400, executionTime, text.length, 0);
       return res.status(400).json({ success: false, error: result.error, status: result.status });
     }
 
@@ -596,13 +665,16 @@ async function processTransformRequest(req, { text, action, actions, preview, pr
       sendWebhook(webhook, { original: text, preset, result, execution_time_ms: executionTime });
     }
 
-    return res.json({
+    const responseBody = {
       success: true,
       original: text,
       preset,
       result,
       execution_time_ms: executionTime
-    });
+    };
+    await logRequest(req, { action: preset, actions: presetActions, text }, 200, executionTime, text.length, JSON.stringify(responseBody).length);
+
+    return res.json(responseBody);
   }
 
   // Handle chaining (actions is always an array here)
@@ -612,6 +684,7 @@ async function processTransformRequest(req, { text, action, actions, preview, pr
     const executionTime = Date.now() - startTime;
 
     if (result.error) {
+      await logRequest(req, { action: actions[0], actions, text }, 400, executionTime, text.length, 0);
       return res.status(400).json({ success: false, error: result.error, status: result.status });
     }
 
@@ -625,13 +698,16 @@ async function processTransformRequest(req, { text, action, actions, preview, pr
       sendWebhook(webhook, { original: text, actions, result: finalResult, execution_time_ms: executionTime });
     }
 
-    return res.json({
+    const responseBody = {
       success: true,
       original: text,
       actions,
       result: finalResult,
       execution_time_ms: executionTime
-    });
+    };
+    await logRequest(req, { action: finalAction, actions, text }, 200, executionTime, text.length, JSON.stringify(responseBody).length);
+
+    return res.json(responseBody);
   }
 
   // Single transformation
@@ -640,6 +716,7 @@ async function processTransformRequest(req, { text, action, actions, preview, pr
   const executionTime = Date.now() - startTime;
 
   if (!result) {
+    await logRequest(req, { action, actions: null, text }, 400, executionTime, text.length, 0);
     return res.status(400).json({
       success: false,
       error: `Invalid action: ${action}`,
@@ -648,6 +725,7 @@ async function processTransformRequest(req, { text, action, actions, preview, pr
   }
 
   if (result.error) {
+    await logRequest(req, { action, actions: null, text }, 500, executionTime, text.length, 0);
     return res.status(500).json({ success: false, error: result.error, status: result.status });
   }
 
@@ -655,13 +733,16 @@ async function processTransformRequest(req, { text, action, actions, preview, pr
     sendWebhook(webhook, { original: text, action, result: result.result, execution_time_ms: executionTime });
   }
 
-  return res.json({
+  const responseBody = {
     success: true,
     original: text,
     action,
     result: result.result,
     execution_time_ms: executionTime
-  });
+  };
+  await logRequest(req, { action, actions: null, text }, 200, executionTime, text.length, JSON.stringify(responseBody).length);
+
+  return res.json(responseBody);
 }
 
 /**
@@ -774,32 +855,38 @@ app.post('/batch', async (req, res) => {
   
   // Validate required parameters
   if (!items || !Array.isArray(items) || items.length === 0) {
+    const executionTime = Date.now() - startTime;
+    await logRequest(req, { action: 'batch', actions: [action], text: `batch:${items.length}` }, 400, executionTime, 0, 0);
     return res.status(400).json({
       success: false,
       error: 'Missing or invalid field: items (must be a non-empty array)',
-      status: 400
+      status: 40000
     });
   }
-  
+
   if (!action) {
+    const executionTime = Date.now() - startTime;
+    await logRequest(req, { action: 'batch', actions: null, text: `batch:${items.length}` }, 400, executionTime, 0, 0);
     return res.status(400).json({
       success: false,
       error: 'Missing required field: action',
       status: 400
     });
   }
-  
+
   // Validate action exists
   if (!getTransformFunction(action)) {
+    const executionTime = Date.now() - startTime;
+    await logRequest(req, { action: 'batch', actions: [action], text: `batch:${items.length}` }, 400, executionTime, 0, 0);
     return res.status(400).json({
       success: false,
       error: `Invalid action: ${action}`,
       status: 400
     });
   }
-  
+
   const params = { limit, length, type };
-  const startTime = Date.now();
+  const batchStartTime = Date.now();
   
   // Process items in parallel while maintaining order
   const results = await Promise.all(
@@ -856,8 +943,8 @@ app.post('/batch', async (req, res) => {
     })
   );
   
-  const executionTime = Date.now() - startTime;
-  
+  const executionTime = Date.now() - batchStartTime;
+
   // Send webhook with batch result if provided
   if (webhook) {
     sendWebhook(webhook, {
@@ -867,14 +954,17 @@ app.post('/batch', async (req, res) => {
       execution_time_ms: executionTime
     });
   }
-  
-  res.json({
+
+  const responseBody = {
     success: true,
     action,
     totalItems: items.length,
     results,
     execution_time_ms: executionTime
-  });
+  };
+  await logRequest(req, { action: 'batch', actions: [action], text: `batch:${items.length}` }, 200, executionTime, JSON.stringify(req.body).length, JSON.stringify(responseBody).length);
+
+  res.json(responseBody);
 });
 
 // ============================================
