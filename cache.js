@@ -29,7 +29,7 @@ async function initRedis() {
     const url = process.env.REDIS_URL;
     
     if (!url) {
-      redisAvailable = false;
+      _redisAvailable = false;
       return false;
     }
     
@@ -37,16 +37,16 @@ async function initRedis() {
     
     redisClient.on('error', (err) => {
       // Redis error - fall back to no-op
-      redisAvailable = false;
+      _redisAvailable = false;
       redisClient = null;
     });
     
     redisClient.on('connect', () => {
-      redisAvailable = true;
+      _redisAvailable = true;
     });
     
     await redisClient.connect();
-    _redisAvailable = true;
+    __redisAvailable = true;
     return true;
   } catch (err) {
     _redisAvailable = false;
@@ -158,7 +158,7 @@ async function del(key) {
  * Clear all cached values
  */
 async function clear() {
-  if (redisAvailable && redisClient) {
+  if (_redisAvailable && redisClient) {
     try {
       await redisClient.flushDb();
     } catch (err) {
