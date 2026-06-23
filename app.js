@@ -452,7 +452,7 @@ app.get('/', (req, res) => {
   <h2>Quick Example</h2>
   <div class="code-example">curl "https://textforge.co/transform?text=Hello%20World!&action=slugify"</div>
 
-  <p><a href="/api-docs">View API Documentation</a></p>
+  <p><a href="/docs">View API Documentation</a></p>
 </body>
 </html>`;
   res.setHeader('Content-Type', 'text/html');
