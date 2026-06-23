@@ -649,11 +649,42 @@ async function processTransformRequest(req, { text, action, actions, preview, pr
     return res.json(responseBody);
   }
 
-  // Handle presets
+  // Handle presets (built-in and custom user presets)
+  let presetActions = null;
+  let isCustomPreset = false;
+
   if (preset && PRESETS[preset]) {
-  const presetActions = PRESETS[preset];
-  const params = { limit, length, type };
-  const result = await executeChainedTransform(req, text, presetActions, params);
+    presetActions = PRESETS[preset];
+  } else if (preset) {
+    // Check for custom user preset
+    const apiKey = req.headers['x-api-key'];
+    if (apiKey) {
+      const { hashApiKey } = require('./apiKeys');
+      const apiKeyHash = hashApiKey(apiKey);
+      
+      // Get customer_id from api_key
+      const keyRecord = await db.get(
+        'SELECT customer_id FROM api_keys WHERE key_hash = $1',
+        [apiKeyHash]
+      );
+      
+      if (keyRecord?.customer_id) {
+        const customPreset = await db.get(
+          'SELECT actions FROM user_presets WHERE customer_id = $1 AND name = $2',
+          [keyRecord.customer_id, preset]
+        );
+        
+        if (customPreset) {
+          presetActions = customPreset.actions;
+          isCustomPreset = true;
+        }
+      }
+    }
+  }
+
+  if (presetActions) {
+    const params = { limit, length, type };
+    const result = await executeChainedTransform(req, text, presetActions, params);
     const executionTime = Date.now() - startTime;
 
     if (result.error) {
@@ -675,6 +706,17 @@ async function processTransformRequest(req, { text, action, actions, preview, pr
     await logRequest(req, { action: preset, actions: presetActions, text }, 200, executionTime, text.length, JSON.stringify(responseBody).length);
 
     return res.json(responseBody);
+  }
+
+  if (preset) {
+    // Preset not found (neither built-in nor custom)
+    const executionTime = Date.now() - startTime;
+    await logRequest(req, { action: preset, actions: null, text }, 400, executionTime, text.length, 0);
+    return res.status(400).json({ 
+      success: false, 
+      error: `Unknown preset: ${preset}`, 
+      status: 400 
+    });
   }
 
   // Handle chaining (actions is always an array here)

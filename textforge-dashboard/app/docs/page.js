@@ -36,6 +36,13 @@ const endpoints = [
   { method: 'POST', path: '/batch', desc: 'Batch process multiple texts' },
   { method: 'GET', path: '/health', desc: 'Health check' },
   { method: 'GET', path: '/stats', desc: 'API statistics' },
+  { method: 'GET', path: '/api/presets', desc: 'List custom presets (Pro)' },
+  { method: 'POST', path: '/api/presets', desc: 'Create custom preset (Pro)' },
+  { method: 'GET', path: '/api/presets/:id', desc: 'Get preset details (Pro)' },
+  { method: 'PUT', path: '/api/presets/:id', desc: 'Update preset (Pro)' },
+  { method: 'DELETE', path: '/api/presets/:id', desc: 'Delete preset (Pro)' },
+  { method: 'GET', path: '/api/analytics', desc: 'Get usage analytics (Pro)' },
+  { method: 'GET', path: '/api/analytics/usage', desc: 'Get usage summary for dashboard (Pro)' },
 ];
 
 export default function Docs() {
@@ -93,6 +100,21 @@ export default function Docs() {
             className={`w-full text-left py-2 px-3 rounded-lg text-sm ${activeTab === 'transformations' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'}`}
           >
             Transformations
+          </button>
+          <div className="pt-4 pb-2">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Pro Features</p>
+          </div>
+          <button
+            onClick={() => setActiveTab('presets')}
+            className={`w-full text-left py-2 px-3 rounded-lg text-sm ${activeTab === 'presets' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'}`}
+          >
+            Custom Presets
+          </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`w-full text-left py-2 px-3 rounded-lg text-sm ${activeTab === 'analytics' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'}`}
+          >
+            Analytics
           </button>
         </nav>
       </aside>
@@ -232,6 +254,161 @@ X-RateLimit-Remaining: 999`}</pre>
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'presets' && (
+          <div>
+            <h1 className="text-3xl font-semibold text-gray-900 mb-6">Custom Presets (Pro)</h1>
+            <p className="text-gray-600 mb-8">
+              Save and reuse custom transformation chains. Requires Pro tier API key.
+            </p>
+
+            <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">List Presets</h2>
+            <div className="code-block mb-8">
+              <pre className="text-gray-300">{`GET /api/presets
+Authorization: X-API-Key: tf_pro_...`}</pre>
+            </div>
+
+            <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">Create Preset</h2>
+            <div className="code-block mb-8">
+              <pre className="text-gray-300">{`POST /api/presets
+Authorization: X-API-Key: tf_pro_...
+Content-Type: application/json
+
+{
+  "name": "my-url-slug",
+  "actions": ["slugify", "removespecial", "kebabcase"],
+  "description": "URL-friendly slug preset"
+}`}</pre>
+            </div>
+
+            <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">Get Preset</h2>
+            <div className="code-block mb-8">
+              <pre className="text-gray-300">{`GET /api/presets/:id
+Authorization: X-API-Key: tf_pro_...`}</pre>
+            </div>
+
+            <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">Update Preset</h2>
+            <div className="code-block mb-8">
+              <pre className="text-gray-300">{`PUT /api/presets/:id
+Authorization: X-API-Key: tf_pro_...
+Content-Type: application/json
+
+{
+  "actions": ["slugify", "kebabcase"],
+  "description": "Updated description"
+}`}</pre>
+            </div>
+
+            <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">Delete Preset</h2>
+            <div className="code-block mb-8">
+              <pre className="text-gray-300">{`DELETE /api/presets/:id
+Authorization: X-API-Key: tf_pro_...`}</pre>
+            </div>
+
+            <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">Use Custom Preset in Transform</h2>
+            <div className="code-block mb-8">
+              <pre className="text-gray-300">{`GET /transform?text=Hello%20World&preset=my-url-slug
+Authorization: X-API-Key: tf_pro_...`}</pre>
+            </div>
+
+            <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="font-semibold text-blue-900 mb-2">Note</h3>
+              <p className="text-blue-800 text-sm">
+                Custom presets are scoped to your customer account. You can only access presets you created.
+                Preset names must be unique per customer.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'analytics' && (
+          <div>
+            <h1 className="text-3xl font-semibold text-gray-900 mb-6">Analytics (Pro)</h1>
+            <p className="text-gray-600 mb-8">
+              Track your API usage, performance, and transformation patterns. Requires Pro tier API key.
+            </p>
+
+            <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">Full Analytics</h2>
+            <div className="code-block mb-8">
+              <pre className="text-gray-300">{`GET /api/analytics?period=30d
+Authorization: X-API-Key: tf_pro_...
+
+# Query Parameters
+# period: 7d, 30d, 90d, or all
+# startDate: YYYY-MM-DD (optional, with endDate)
+# endDate: YYYY-MM-DD (optional, with startDate)`}</pre>
+            </div>
+
+            <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">Response Format</h2>
+            <div className="code-block mb-8">
+              <pre className="text-gray-300">{`{
+  "success": true,
+  "analytics": {
+    "summary": {
+      "totalRequests": 1250,
+      "totalTransformations": 3400,
+      "avgLatencyMs": 2.1,
+      "totalRequestBytes": 1024000,
+      "totalResponseBytes": 2048000,
+      "totalErrors": 3,
+      "errorRate": 0.24,
+      "actionBreakdown": {
+        "slugify": 500,
+        "camelcase": 300,
+        "base64encode": 200
+      }
+    },
+    "daily": [
+      { "date": "2026-01-15", "total_requests": 42, "total_transformations": 120, ... },
+      ...
+    ],
+    "topActions": [
+      { "action": "slugify", "count": 500, "avg_latency_ms": 1.5 },
+      ...
+    ],
+    "recentRequests": [
+      { "action": "slugify", "status_code": 200, "latency_ms": 1, "created_at": "..." },
+      ...
+    ]
+  }
+}`}</pre>
+            </div>
+
+            <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">Usage Summary (for Dashboard)</h2>
+            <div className="code-block mb-8">
+              <pre className="text-gray-300">{`GET /api/analytics/usage
+Authorization: X-API-Key: tf_pro_...
+
+{
+  "success": true,
+  "usage": {
+    "today": { "requests_today": 42, "transforms_today": 120 },
+    "thisMonth": { "requests_this_month": 1250, "transforms_this_month": 3400 },
+    "lastMonth": { "requests_last_month": 980 },
+    "rateLimit": { "limit": 50000, "used": 1250, "remaining": 48750, "resetAt": 1704067200000 }
+  }
+}`}</pre>
+            </div>
+
+            <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">Daily Rollup</h2>
+            <p className="text-gray-600 mb-4">
+              Analytics are aggregated daily via a rollup job. The <code>/api/analytics</code> endpoint reads from 
+              the <code>daily_analytics</code> table which is updated from <code>request_logs</code> each day.
+            </p>
+            <div className="code-block mb-8">
+              <pre className="text-gray-300">{`# Trigger rollup manually (admin)
+POST /api/analytics/rollup`}</pre>
+            </div>
+
+            <div className="mt-8 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <h3 className="font-semibold text-green-900 mb-2">Pro Feature</h3>
+              <p className="text-green-800 text-sm">
+                Analytics are available only for Pro tier API keys (tf_pro_...). 
+                Free tier users will receive a 401 error.
+              </p>
             </div>
           </div>
         )}
