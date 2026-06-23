@@ -70,7 +70,7 @@ export default function Billing() {
   const handleUpgrade = async (plan) => {
     if (plan.name === 'Free' || plan.name === 'Enterprise') {
       if (plan.name === 'Enterprise') {
-        window.location.href = 'mailto:sales@textforge.com';
+        window.location.href = 'mailto:odderonlab@protonmail.com';
       }
       return;
     }

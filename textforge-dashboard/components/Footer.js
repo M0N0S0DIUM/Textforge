@@ -15,7 +15,7 @@ export default function Footer() {
             <Link href="/billing" className="hover:text-gray-900">
               Pricing
             </Link>
-            <a href="mailto:support@textforge.co" className="hover:text-gray-900">
+            <a href="mailto:odderonlab@protonmail.com" className="hover:text-gray-900">
               Support
             </a>
           </div>

@@ -29,7 +29,7 @@ const plans = [
     description: 'For high-volume needs',
     features: ['Unlimited requests', 'Dedicated support', 'SLA guarantee', 'Custom integrations', 'On-premise option'],
     cta: 'Contact Sales',
-    href: 'mailto:sales@textforge.co',
+    href: 'mailto:odderonlab@protonmail.com',
     highlight: false,
   },
 ];
