@@ -13,6 +13,21 @@ export default function Dashboard() {
   const [keys, setKeys] = useState([]);
   const [plan, setPlan] = useState('Free');
 
+  // Load API key from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('textforge_customer');
+    if (stored) {
+      try {
+        const data = JSON.parse(stored);
+        if (data.apiKey) {
+          setApiKey(data.apiKey);
+        }
+      } catch (err) {
+        console.error('Failed to parse customer data:', err);
+      }
+    }
+  }, []);
+
   // Fetch stats from API (per-user analytics)
   useEffect(() => {
     const fetchStats = async () => {
@@ -69,11 +84,28 @@ export default function Dashboard() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/keys`, { method: 'POST' });
+      const response = await fetch(`${API_URL}/api/keys`, { 
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey 
+        }
+      });
       const data = await response.json();
       if (data.success && data.key) {
         setApiKey(data.key.key);
         setKeys([data.key]);
+        // Update localStorage with new key
+        const stored = localStorage.getItem('textforge_customer');
+        if (stored) {
+          try {
+            const data = JSON.parse(stored);
+            data.apiKey = data.key.key;
+            localStorage.setItem('textforge_customer', JSON.stringify(data));
+          } catch (err) {
+            console.error('Failed to update localStorage:', err);
+          }
+        }
       } else {
         console.error('Failed to regenerate key:', data.error);
       }
@@ -89,11 +121,15 @@ export default function Dashboard() {
 
     try {
       if (keys.length > 0 && keys[0].id) {
-        await fetch(`${API_URL}/api/keys/${keys[0].id}`, { method: 'DELETE' });
+        await fetch(`${API_URL}/api/keys/${keys[0].id}`, { 
+          method: 'DELETE',
+          headers: { 'X-API-Key': apiKey }
+        });
       }
       setApiKey('');
       setKeys([]);
       setPlan('Free');
+      localStorage.removeItem('textforge_customer');
     } catch (err) {
       console.error('Failed to revoke key:', err);
     }

@@ -6,11 +6,27 @@ import { Copy, Check, RefreshCw, Trash2, Key } from 'lucide-react';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export default function Keys() {
+  const [apiKey, setApiKey] = useState('');
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [copiedKey, setCopiedKey] = useState(null);
   const [message, setMessage] = useState(null);
   const [userTier, setUserTier] = useState('Free');  // Track user's tier
+
+  // Load API key from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('textforge_customer');
+    if (stored) {
+      try {
+        const data = JSON.parse(stored);
+        if (data.apiKey) {
+          setApiKey(data.apiKey);
+        }
+      } catch (err) {
+        console.error('Failed to parse customer data:', err);
+      }
+    }
+  }, []);
 
   // Fetch API keys (only if we have an API key)
   useEffect(() => {
@@ -72,6 +88,18 @@ export default function Keys() {
       const data = await response.json();
       if (data.success && data.key) {
         setKeys([data.key, ...keys]);
+        setApiKey(data.key.key);
+        // Update localStorage with new key
+        const stored = localStorage.getItem('textforge_customer');
+        if (stored) {
+          try {
+            const data = JSON.parse(stored);
+            data.apiKey = data.key.key;
+            localStorage.setItem('textforge_customer', JSON.stringify(data));
+          } catch (err) {
+            console.error('Failed to update localStorage:', err);
+          }
+        }
         setMessage({ type: 'success', text: 'New API key generated successfully!' });
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to generate new key.' });
@@ -93,7 +121,26 @@ export default function Keys() {
       });
       const data = await response.json();
       if (data.success) {
-        setKeys(keys.filter((k) => k.id !== keyId));
+        const updatedKeys = keys.filter((k) => k.id !== keyId);
+        setKeys(updatedKeys);
+        // If we revoked the current key, clear apiKey
+        if (updatedKeys.length === 0) {
+          setApiKey('');
+          localStorage.removeItem('textforge_customer');
+        } else if (keys[0]?.id === keyId) {
+          // If we revoked the first key, use the next one
+          setApiKey(updatedKeys[0].key);
+          const stored = localStorage.getItem('textforge_customer');
+          if (stored) {
+            try {
+              const data = JSON.parse(stored);
+              data.apiKey = updatedKeys[0].key;
+              localStorage.setItem('textforge_customer', JSON.stringify(data));
+            } catch (err) {
+              console.error('Failed to update localStorage:', err);
+            }
+          }
+        }
         setMessage({ type: 'success', text: 'API key revoked successfully.' });
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to revoke key.' });
