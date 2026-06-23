@@ -19,14 +19,6 @@ const plans = [
     cta: 'Upgrade to Pro',
     current: false,
   },
-  {
-    name: 'Enterprise',
-    price: 'Custom',
-    description: 'For high-volume needs',
-    features: ['Unlimited requests', 'Dedicated support', 'SLA guarantee', 'Custom integrations', 'On-premise option'],
-    cta: 'Contact Sales',
-    current: false,
-  },
 ];
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
@@ -68,10 +60,7 @@ export default function Billing() {
   }, [customerId]);
 
   const handleUpgrade = async (plan) => {
-    if (plan.name === 'Free' || plan.name === 'Enterprise') {
-      if (plan.name === 'Enterprise') {
-        window.location.href = 'mailto:odderonlab@protonmail.com';
-      }
+    if (plan.name === 'Free') {
       return;
     }
 

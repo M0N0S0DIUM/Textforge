@@ -22,16 +22,6 @@ const plans = [
     href: '/billing',
     highlight: true,
   },
-  {
-    name: 'Enterprise',
-    price: 'Custom',
-    period: '',
-    description: 'For high-volume needs',
-    features: ['Unlimited requests', 'Dedicated support', 'SLA guarantee', 'Custom integrations', 'On-premise option'],
-    cta: 'Contact Sales',
-    href: 'mailto:odderonlab@protonmail.com',
-    highlight: false,
-  },
 ];
 
 export default function Pricing() {

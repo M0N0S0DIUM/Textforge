@@ -12,7 +12,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const TIER_PRICE_MAP = {
   free: null, // free tier has no price ID
   pro: process.env.STRIPE_PRO_PRICE_ID || process.env.STRIPE_PRICE_ID, // Pro plan price ID
-  enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID, // Enterprise plan price ID
 };
 
 // Stricter rate limit for key management endpoints to prevent enumeration / abuse.
@@ -531,7 +530,6 @@ function _upsertInvoice(invoice, status) {
 function _tierFromItems(sub) {
   const priceId = sub.items?.data?.[0]?.price?.id;
   if (!priceId) return 'free';
-  if (priceId === process.env.STRIPE_ENTERPRISE_PRICE_ID) return 'enterprise';
   return 'pro';
 }
 
