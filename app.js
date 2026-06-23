@@ -479,7 +479,7 @@ app.get('/stats', (req, res) => {
 // Dashboard Routes (served from Next.js build)
 // ============================================
 const fs = require('fs');
-const path = require('path');
+// path already imported at line 25
 
 // Serve dashboard pages if built
 const dashboardDir = path.join(__dirname, 'textforge-dashboard', '.next', 'server', 'app');
