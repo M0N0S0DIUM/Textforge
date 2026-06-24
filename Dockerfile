@@ -21,6 +21,9 @@ RUN npm ci && \
 # ---- Build Dashboard Stage ----
 FROM base AS dashboard-builder
 
+# Force rebuild of dashboard when this changes
+ARG DASHBOARD_BUILD_KEY=2
+
 WORKDIR /app
 
 # Copy source files
