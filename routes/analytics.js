@@ -40,28 +40,29 @@ router.get('/analytics', async (req, res) => {
     let paramIndex = 2;
 
     if (startDate && endDate) {
-      dateFilter = `AND date >= $${paramIndex++} AND date <= $${paramIndex++}`;
+      dateFilter = `AND created_at >= ${paramIndex} AND created_at <= ${paramIndex+1}`;
       params.push(startDate, endDate);
+      paramIndex += 2;
     } else {
       const days = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : null;
       if (days) {
-        dateFilter = `AND date >= CURRENT_DATE - INTERVAL '${days} days'`;
+        dateFilter = `AND created_at >= CURRENT_DATE - INTERVAL '${days} days'`;
       }
     }
 
-    // Get daily analytics for the period
+    // Get daily analytics for the period from request_logs since daily_analytics might be empty
     const dailyResult = await db.query(
       `SELECT 
-        date,
-        total_requests,
-        total_transformations,
-        total_latency_ms,
-        total_request_bytes,
-        total_response_bytes,
-        errors,
-        action_breakdown
-       FROM daily_analytics 
+        DATE_TRUNC('day', created_at) as date,
+        COUNT(*) as total_requests,
+        COALESCE(SUM(CASE WHEN action IS NOT NULL THEN 1 ELSE jsonb_array_length(actions) END), 0) as total_transformations,
+        COALESCE(SUM(latency_ms), 0) as total_latency_ms,
+        COALESCE(SUM(request_size_bytes), 0) as total_request_bytes,
+        COALESCE(SUM(response_size_bytes), 0) as total_response_bytes,
+        SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) as errors
+       FROM request_logs 
        WHERE api_key_hash = $1 ${dateFilter}
+       GROUP BY DATE_TRUNC('day', created_at)
        ORDER BY date ASC`,
       params
     );
@@ -109,8 +110,7 @@ router.get('/analytics', async (req, res) => {
     const topActionsResult = await db.query(
       `SELECT action, COUNT(*) as count, AVG(latency_ms) as avg_latency_ms
        FROM request_logs 
-       WHERE api_key_hash = $1 
-       ${dateFilter ? dateFilter.replace('date', 'created_at::date') : ''}
+       WHERE api_key_hash = $1 ${dateFilter}
        GROUP BY action 
        ORDER BY count DESC 
        LIMIT 20`,
@@ -121,7 +121,7 @@ router.get('/analytics', async (req, res) => {
     const recentResult = await db.query(
       `SELECT action, actions, status_code, latency_ms, created_at
        FROM request_logs 
-       WHERE api_key_hash = $1 
+       WHERE api_key_hash = $1 ${dateFilter}
        ORDER BY created_at DESC 
        LIMIT 50`,
       [identifier.identifier]
@@ -150,34 +150,35 @@ router.get('/analytics/usage', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Unable to identify user' });
     }
 
-    // Current month
-    const currentMonth = await db.query(
-      `SELECT 
-        COALESCE(SUM(total_requests), 0) as requests_this_month,
-        COALESCE(SUM(total_transformations), 0) as transforms_this_month
-       FROM daily_analytics 
-       WHERE api_key_hash = $1 AND date >= DATE_TRUNC('month', CURRENT_DATE)`,
-      [identifier.identifier]
-    );
-
-    // Last month for comparison
-    const lastMonth = await db.query(
-      `SELECT 
-        COALESCE(SUM(total_requests), 0) as requests_last_month
-       FROM daily_analytics 
-       WHERE api_key_hash = $1 
-       AND date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
-       AND date < DATE_TRUNC('month', CURRENT_DATE)`,
-      [identifier.identifier]
-    );
-
-    // Today
+    // Query request_logs directly since daily_analytics might be empty
+    // Today (from request_logs)
     const today = await db.query(
       `SELECT 
-        COALESCE(SUM(total_requests), 0) as requests_today,
-        COALESCE(SUM(total_transformations), 0) as transforms_today
-       FROM daily_analytics 
-       WHERE api_key_hash = $1 AND date = CURRENT_DATE`,
+        COUNT(*) as requests_today,
+        COALESCE(SUM(CASE WHEN action IS NOT NULL THEN 1 ELSE jsonb_array_length(actions) END), 0) as transforms_today
+       FROM request_logs 
+       WHERE api_key_hash = $1 AND created_at::date = CURRENT_DATE`,
+      [identifier.identifier]
+    );
+
+    // Current month (from request_logs)
+    const currentMonth = await db.query(
+      `SELECT 
+        COUNT(*) as requests_this_month,
+        COALESCE(SUM(CASE WHEN action IS NOT NULL THEN 1 ELSE jsonb_array_length(actions) END), 0) as transforms_this_month
+       FROM request_logs 
+       WHERE api_key_hash = $1 AND created_at >= DATE_TRUNC('month', CURRENT_DATE)`,
+      [identifier.identifier]
+    );
+
+    // Last month (from request_logs)
+    const lastMonth = await db.query(
+      `SELECT 
+        COUNT(*) as requests_last_month
+       FROM request_logs 
+       WHERE api_key_hash = $1 
+       AND created_at >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
+       AND created_at < DATE_TRUNC('month', CURRENT_DATE)`,
       [identifier.identifier]
     );
 
