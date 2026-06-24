@@ -187,13 +187,13 @@ router.get('/analytics/usage', async (req, res) => {
     );
 
     // Last month (from request_logs)
-    const lastMonthWhereClause = identifier.type === 'api_key' 
-      ? "WHERE api_key_hash = $1 
+    const lastMonthWhereClause = identifier.type === 'api_key'
+      ? `WHERE api_key_hash = $1 
        AND created_at >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
-       AND created_at < DATE_TRUNC('month', CURRENT_DATE)"
-      : "WHERE api_key_hash IS NULL 
+       AND created_at < DATE_TRUNC('month', CURRENT_DATE)`
+      : `WHERE api_key_hash IS NULL 
        AND created_at >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
-       AND created_at < DATE_TRUNC('month', CURRENT_DATE)";
+       AND created_at < DATE_TRUNC('month', CURRENT_DATE)`;
     const lastMonthParams = identifier.type === 'api_key' ? [identifier.identifier] : [];
     const lastMonth = await db.query(
       `SELECT 
