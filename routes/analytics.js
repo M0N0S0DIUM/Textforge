@@ -19,10 +19,10 @@ async function getIdentifierFromRequest(req) {
     }
   }
   
-  // For anonymous users, use IP hash
+  // For anonymous users, use IP hash (stored as just the hash in database)
   const ip = req.ip || req.connection.remoteAddress || 'unknown';
   const ipHash = crypto.createHash('sha256').update(ip).digest('hex').substring(0, 16);
-  return { type: 'ip', identifier: `ip:${ipHash}` };
+  return { type: 'ip', identifier: ipHash };
 }
 
 // GET /api/analytics - Get analytics for the authenticated API key or IP
