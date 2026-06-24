@@ -3,17 +3,40 @@ const { Pool } = require('pg');
 // Get database URL from environment (Railway uses DATABASE_URL)
 const DATABASE_URL = process.env.DATABASE_URL;
 
-if (!DATABASE_URL) {
-  throw new Error('DATABASE_URL environment variable is required for PostgreSQL');
+// Create connection pool lazily to allow build-time usage without DB
+let pool = null;
+
+function getPool() {
+  if (!pool) {
+    if (!DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is required for PostgreSQL');
+    }
+    pool = new Pool({
+      connectionString: DATABASE_URL,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    });
+  }
+  return pool;
 }
 
-// Create connection pool
-const pool = new Pool({
-  connectionString: DATABASE_URL,
-  max: 10, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-});
+// Lazy wrappers for all pool methods
+function query(text, params) { return getPool().query(text, params); }
+function get(text, params) { return getPool().query(text, params).then(r => r.rows[0]); }
+function prepare(name, text, params) { return getPool().query({ name, text, values: params }); }
+function close() { return pool ? pool.end() : Promise.resolve(); }
+
+// Export all functions with lazy initialization
+module.exports = {
+  query,
+  get,
+  prepare,
+  init,
+  close,
+  get pool() { return getPool(); },
+  runMigrations
+};
 
 // ============================================
 // Schema Migrations
@@ -306,12 +329,5 @@ if (require.main === module) {
     });
 }
 
-module.exports = {
-  query,
-  get,
-  prepare,
-  init,
-  close,
-  pool,
-  runMigrations
-};
+// ============================================
+// End of file
