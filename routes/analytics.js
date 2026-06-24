@@ -1,8 +1,8 @@
 const express = require('express');
 const db = require('../db');
 const logger = require('../logger');
-const { hashApiKey } = require('./apiKeys');
-const { validateApiKey } = require('./rateLimiter');
+const { hashApiKey } = require('../apiKeys');
+const { validateApiKey } = require('../rateLimiter');
 
 const router = express.Router();
 
@@ -182,7 +182,7 @@ router.get('/analytics/usage', async (req, res) => {
     );
 
     // Get rate limit info from rate limiter
-    const { getStats: getRateStats } = require('./rateLimiter');
+    const { getStats: getRateStats } = require('../rateLimiter');
     const rateStats = getRateStats();
     
     let rateLimitInfo = null;
