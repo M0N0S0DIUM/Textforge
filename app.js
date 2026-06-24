@@ -390,6 +390,19 @@ app.use('/api', analyticsRouter);
 const adminRouter = require('./routes/admin');
 app.use('/admin', adminRouter);
 
+// Serve Next.js dashboard static files
+const dashboardBuildPath = path.join(__dirname, 'textforge-dashboard', '.next');
+const dashboardPublicPath = path.join(__dirname, 'textforge-dashboard', 'public');
+
+// Serve static assets (JS, CSS, images)
+app.use('/_next/static', express.static(path.join(dashboardBuildPath, 'static')));
+app.use('/_next/data', express.static(path.join(dashboardBuildPath, 'server', 'app')));
+app.use('/favicon.ico', express.static(path.join(dashboardPublicPath, 'favicon.ico')));
+app.use('/robots.txt', express.static(path.join(dashboardPublicPath, 'robots.txt')));
+
+// Serve Next.js pages via static HTML files
+app.use(express.static(dashboardBuildPath));
+
 // ============================================
 // Routes
 // ============================================
@@ -1022,6 +1035,12 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
 // ============================================
 // Error Handling
 // ============================================
+
+// Dashboard catch-all: serve dashboard index.html for client-side routes
+const dashboardRoutes = ['/dashboard', '/keys', '/billing', '/docs', '/pricing', '/login', '/register', '/reset-password', '/verify-email'];
+app.get(dashboardRoutes, (req, res) => {
+  res.sendFile(path.join(dashboardBuildPath, 'server', 'app', 'dashboard.html'));
+});
 
 // 404 handler
 app.use((req, res) => {
