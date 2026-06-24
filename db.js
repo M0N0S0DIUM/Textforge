@@ -302,11 +302,12 @@ function prepare(text) {
 async function init() {
   try {
     // Test connection
-    await pool.query('SELECT 1');
+    await getPool().query('SELECT 1');
     console.log('Database connection established');
   } catch (err) {
     console.error('Failed to connect to database:', err.message);
     throw err;
+ 
   }
 }
 
@@ -315,8 +316,10 @@ async function init() {
  * @returns {Promise<void>}
  */
 async function close() {
-  await pool.end();
-  console.log('Database connection pool closed');
+  if (pool) {
+    await pool.end();
+    console.log('Database connection pool closed');
+  }
 }
 
 // Initialize migrations on module load if in standalone mode
