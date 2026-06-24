@@ -28,6 +28,9 @@ export default function Dashboard() {
     }
   }, []);
 
+  // Show note for free tier users
+  const [showFreeTierNote, setShowFreeTierNote] = useState(false);
+
   // Fetch stats from API (per-user analytics)
   useEffect(() => {
     const fetchStats = async () => {
@@ -169,6 +172,11 @@ export default function Dashboard() {
               </button>
             )}
           </div>
+          {!apiKey && (
+            <p className="text-xs text-yellow-600 mt-2">
+              <span className="font-semibold">Note:</span> Free tier users can make 1,000 requests/day without an API key
+            </p>
+          )}
         </div>
         <div className="card">
           <div className="text-sm text-gray-500 mb-1">Requests Today</div>

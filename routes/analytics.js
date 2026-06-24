@@ -1,34 +1,42 @@
 const express = require('express');
 const db = require('../db');
 const logger = require('../logger');
-const { hashApiKey } = require('../apiKeys');
-const { validateApiKey } = require('../rateLimiter');
+const { hashApiKey } = require('./apiKeys');
+const { validateApiKey } = require('./rateLimiter');
 
 const router = express.Router();
 
-// Helper: Get api_key_hash from API key
-async function getApiKeyHashFromRequest(req) {
+const crypto = require('crypto');
+
+// Helper: Get api_key_hash from API key, or ip_hash for anonymous users
+async function getIdentifierFromRequest(req) {
   const apiKey = req.headers['x-api-key'];
-  if (!apiKey) return null;
   
-  const validation = await validateApiKey(apiKey);
-  if (!validation.valid || !validation.keyHash) return null;
+  if (apiKey) {
+    const validation = await validateApiKey(apiKey);
+    if (validation.valid && validation.keyHash) {
+      return { type: 'api_key', identifier: `api:${validation.keyHash}` };
+    }
+  }
   
-  return validation.keyHash;
+  // For anonymous users, use IP hash
+  const ip = req.ip || req.connection.remoteAddress || 'unknown';
+  const ipHash = crypto.createHash('sha256').update(ip).digest('hex').substring(0, 16);
+  return { type: 'ip', identifier: `ip:${ipHash}` };
 }
 
-// GET /api/analytics - Get analytics for the authenticated API key
+// GET /api/analytics - Get analytics for the authenticated API key or IP
 // Query params: period (7d, 30d, 90d, all), startDate, endDate
 router.get('/analytics', async (req, res) => {
   try {
-    const apiKeyHash = await getApiKeyHashFromRequest(req);
-    if (!apiKeyHash) {
-      return res.status(401).json({ success: false, error: 'Valid API key required' });
+    const identifier = await getIdentifierFromRequest(req);
+    if (!identifier) {
+      return res.status(401).json({ success: false, error: 'Unable to identify user' });
     }
 
     const { period = '30d', startDate, endDate } = req.query;
     let dateFilter = '';
-    const params = [apiKeyHash];
+    const params = [identifier.identifier];
     let paramIndex = 2;
 
     if (startDate && endDate) {
@@ -106,7 +114,7 @@ router.get('/analytics', async (req, res) => {
        GROUP BY action 
        ORDER BY count DESC 
        LIMIT 20`,
-      [apiKeyHash]
+      [identifier.identifier]
     );
 
     // Get recent requests (last 50)
@@ -116,7 +124,7 @@ router.get('/analytics', async (req, res) => {
        WHERE api_key_hash = $1 
        ORDER BY created_at DESC 
        LIMIT 50`,
-      [apiKeyHash]
+      [identifier.identifier]
     );
 
     res.json({
@@ -137,9 +145,9 @@ router.get('/analytics', async (req, res) => {
 // GET /api/analytics/usage - Simplified usage summary for dashboard cards
 router.get('/analytics/usage', async (req, res) => {
   try {
-    const apiKeyHash = await getApiKeyHashFromRequest(req);
-    if (!apiKeyHash) {
-      return res.status(401).json({ success: false, error: 'Valid API key required' });
+    const identifier = await getIdentifierFromRequest(req);
+    if (!identifier) {
+      return res.status(401).json({ success: false, error: 'Unable to identify user' });
     }
 
     // Current month
@@ -149,7 +157,7 @@ router.get('/analytics/usage', async (req, res) => {
         COALESCE(SUM(total_transformations), 0) as transforms_this_month
        FROM daily_analytics 
        WHERE api_key_hash = $1 AND date >= DATE_TRUNC('month', CURRENT_DATE)`,
-      [apiKeyHash]
+      [identifier.identifier]
     );
 
     // Last month for comparison
@@ -160,7 +168,7 @@ router.get('/analytics/usage', async (req, res) => {
        WHERE api_key_hash = $1 
        AND date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
        AND date < DATE_TRUNC('month', CURRENT_DATE)`,
-      [apiKeyHash]
+      [identifier.identifier]
     );
 
     // Today
@@ -170,13 +178,38 @@ router.get('/analytics/usage', async (req, res) => {
         COALESCE(SUM(total_transformations), 0) as transforms_today
        FROM daily_analytics 
        WHERE api_key_hash = $1 AND date = CURRENT_DATE`,
-      [apiKeyHash]
+      [identifier.identifier]
     );
 
     // Get rate limit info from rate limiter
-    const { getStats: getRateStats } = require('../rateLimiter');
+    const { getStats: getRateStats } = require('./rateLimiter');
     const rateStats = getRateStats();
-    const keyEntry = rateStats.entries?.find(e => e.key === `api:${apiKeyHash}`);
+    
+    let rateLimitInfo = null;
+    
+    if (identifier.type === 'api_key') {
+      const keyEntry = rateStats.entries?.find(e => e.key === identifier.identifier);
+      if (keyEntry) {
+        rateLimitInfo = {
+          limit: keyEntry.count > 25000 ? 50000 : 1000, // rough heuristic
+          used: keyEntry.count,
+          remaining: Math.max(0, (keyEntry.count > 25000 ? 50000 : 1000) - keyEntry.count),
+          resetAt: keyEntry.resetAt
+        };
+      }
+    } else {
+      // For IP-based usage, get from rate limiter using ip:${ipHash} format
+      const ipRateLimitKey = `ip:${identifier.identifier.replace('ip:', '')}`;
+      const keyEntry = rateStats.entries?.find(e => e.key === ipRateLimitKey);
+      if (keyEntry) {
+        rateLimitInfo = {
+          limit: 1000, // Free tier for IP-based
+          used: keyEntry.count,
+          remaining: Math.max(0, 1000 - keyEntry.count),
+          resetAt: keyEntry.resetAt
+        };
+      }
+    }
 
     res.json({
       success: true,
@@ -184,12 +217,7 @@ router.get('/analytics/usage', async (req, res) => {
         today: today.rows[0],
         thisMonth: currentMonth.rows[0],
         lastMonth: lastMonth.rows[0],
-        rateLimit: keyEntry ? {
-          limit: keyEntry.count > 25000 ? 50000 : 1000, // rough heuristic
-          used: keyEntry.count,
-          remaining: Math.max(0, (keyEntry.count > 25000 ? 50000 : 1000) - keyEntry.count),
-          resetAt: keyEntry.resetAt
-        } : null
+        rateLimit: rateLimitInfo
       }
     });
   } catch (error) {
