@@ -337,14 +337,17 @@ async function logRequest(req, { action, actions, text }, statusCode, latencyMs,
     const apiKey = req.headers['x-api-key'];
     let apiKeyHash = null;
     
+    // Hash IP for privacy (used for anonymous users)
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    const ipHash = crypto.createHash('sha256').update(ip).digest('hex').substring(0, 16);
+    
     if (apiKey) {
       const { hashApiKey } = require('./apiKeys');
       apiKeyHash = hashApiKey(apiKey);
+    } else {
+      // For anonymous users, use IP hash in api_key_hash column (NOT NULL constraint)
+      apiKeyHash = ipHash;
     }
-
-    // Hash IP for privacy
-    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
-    const ipHash = crypto.createHash('sha256').update(ip).digest('hex').substring(0, 16);
 
     // Determine primary action for logging
     const primaryAction = action || (actions && actions.length > 0 ? actions[0] : 'preview');
