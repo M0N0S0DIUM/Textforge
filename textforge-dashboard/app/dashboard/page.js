@@ -142,6 +142,17 @@ export default function Dashboard() {
   const requestsToday = stats?.today?.requests_today || 0;
   const usagePercent = Math.min((requestsToday / dailyLimit) * 100, 100);
 
+  // Helper to show curl commands for checking stats
+  const getStatsCommands = () => {
+    if (!apiKey) return null;
+    const isPro = plan === 'Pro';
+    return {
+      free: `curl -s "${API_URL}/api/analytics/usage"`,
+      pro: `curl -s "${API_URL}/api/analytics/usage" -H "X-API-Key: ${apiKey}"`,
+      isPro
+    };
+  };
+
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -181,6 +192,13 @@ export default function Dashboard() {
         <div className="card">
           <div className="text-sm text-gray-500 mb-1">Requests Today</div>
           <div className="text-2xl font-bold text-gray-900">{stats?.today?.requests_today?.toLocaleString() || '0'}</div>
+          {apiKey && (
+            <div className="mt-2 text-xs text-gray-500 font-mono bg-gray-50 p-2 rounded">
+              {getStatsCommands()?.isPro 
+                ? getStatsCommands()?.pro 
+                : getStatsCommands()?.free}
+            </div>
+          )}
         </div>
         <div className="card">
           <div className="text-sm text-gray-500 mb-1">Plan</div>
@@ -245,6 +263,27 @@ export default function Dashboard() {
           </a>
         </div>
       </div>
+
+      {/* Manual Stats Check (Analytics API may have delays) */}
+      {apiKey && (
+        <div className="card mt-8">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Check Usage via CLI</h3>
+          <p className="text-gray-600 mb-4">Run these commands to get real-time usage stats:</p>
+          <div className="space-y-3">
+            <div>
+              <span className="font-medium text-gray-700">Free tier (no API key):</span>
+              <pre className="mt-1 text-xs bg-gray-100 p-3 rounded overflow-x-auto">{getStatsCommands()?.free}</pre>
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">Pro tier (with API key):</span>
+              <pre className="mt-1 text-xs bg-gray-100 p-3 rounded overflow-x-auto">{getStatsCommands()?.pro}</pre>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-gray-500">
+            Note: Dashboard stats may be delayed. Use the commands above for real-time data.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
