@@ -51,6 +51,10 @@ router.get('/analytics', async (req, res) => {
     }
 
     // Get daily analytics for the period from request_logs since daily_analytics might be empty
+    const dailyWhereClause = identifier.type === 'api_key' 
+      ? 'WHERE api_key_hash = $1'
+      : 'WHERE api_key_hash IS NULL';
+    const dailyParams = identifier.type === 'api_key' ? [identifier.identifier, ...params.slice(1)] : params;
     const dailyResult = await db.query(
       `SELECT 
         DATE_TRUNC('day', created_at) as date,
@@ -60,11 +64,10 @@ router.get('/analytics', async (req, res) => {
         COALESCE(SUM(request_size_bytes), 0) as total_request_bytes,
         COALESCE(SUM(response_size_bytes), 0) as total_response_bytes,
         SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) as errors
-       FROM request_logs 
-       WHERE api_key_hash = $1 ${dateFilter}
+       FROM request_logs ${dailyWhereClause} ${dateFilter}
        GROUP BY DATE_TRUNC('day', created_at)
        ORDER BY date ASC`,
-      params
+      dailyParams
     );
 
     // Calculate aggregates
@@ -107,24 +110,30 @@ router.get('/analytics', async (req, res) => {
     }
 
     // Get top actions for the period
+    const topActionsWhereClause = identifier.type === 'api_key' 
+      ? 'WHERE api_key_hash = $1'
+      : 'WHERE api_key_hash IS NULL';
+    const topActionsParams = identifier.type === 'api_key' ? [identifier.identifier, ...params.slice(1)] : params;
     const topActionsResult = await db.query(
       `SELECT action, COUNT(*) as count, AVG(latency_ms) as avg_latency_ms
-       FROM request_logs 
-       WHERE api_key_hash = $1 ${dateFilter}
+       FROM request_logs ${topActionsWhereClause} ${dateFilter}
        GROUP BY action 
        ORDER BY count DESC 
        LIMIT 20`,
-      [identifier.identifier]
+      topActionsParams
     );
 
     // Get recent requests (last 50)
+    const recentWhereClause = identifier.type === 'api_key' 
+      ? 'WHERE api_key_hash = $1'
+      : 'WHERE api_key_hash IS NULL';
+    const recentParams = identifier.type === 'api_key' ? [identifier.identifier, ...params.slice(1)] : params;
     const recentResult = await db.query(
       `SELECT action, actions, status_code, latency_ms, created_at
-       FROM request_logs 
-       WHERE api_key_hash = $1 ${dateFilter}
+       FROM request_logs ${recentWhereClause} ${dateFilter}
        ORDER BY created_at DESC 
        LIMIT 50`,
-      [identifier.identifier]
+      recentParams
     );
 
     res.json({
@@ -151,35 +160,46 @@ router.get('/analytics/usage', async (req, res) => {
     }
 
     // Query request_logs directly since daily_analytics might be empty
-    // Today (from request_logs)
+    // Today (from request_logs) - handle NULL for anonymous users
+    const todayWhereClause = identifier.type === 'api_key' 
+      ? 'WHERE api_key_hash = $1 AND created_at::date = CURRENT_DATE'
+      : 'WHERE api_key_hash IS NULL AND created_at::date = CURRENT_DATE';
+    const todayParams = identifier.type === 'api_key' ? [identifier.identifier] : [];
     const today = await db.query(
       `SELECT 
         COUNT(*) as requests_today,
         COALESCE(SUM(CASE WHEN action IS NOT NULL THEN 1 ELSE jsonb_array_length(actions) END), 0) as transforms_today
-       FROM request_logs 
-       WHERE api_key_hash = $1 AND created_at::date = CURRENT_DATE`,
-      [identifier.identifier]
+       FROM request_logs ${todayWhereClause}`,
+      todayParams
     );
 
     // Current month (from request_logs)
+    const currentMonthWhereClause = identifier.type === 'api_key' 
+      ? "WHERE api_key_hash = $1 AND created_at >= DATE_TRUNC('month', CURRENT_DATE)"
+      : "WHERE api_key_hash IS NULL AND created_at >= DATE_TRUNC('month', CURRENT_DATE)";
+    const currentMonthParams = identifier.type === 'api_key' ? [identifier.identifier] : [];
     const currentMonth = await db.query(
       `SELECT 
         COUNT(*) as requests_this_month,
         COALESCE(SUM(CASE WHEN action IS NOT NULL THEN 1 ELSE jsonb_array_length(actions) END), 0) as transforms_this_month
-       FROM request_logs 
-       WHERE api_key_hash = $1 AND created_at >= DATE_TRUNC('month', CURRENT_DATE)`,
-      [identifier.identifier]
+       FROM request_logs ${currentMonthWhereClause}`,
+      currentMonthParams
     );
 
     // Last month (from request_logs)
+    const lastMonthWhereClause = identifier.type === 'api_key' 
+      ? "WHERE api_key_hash = $1 
+       AND created_at >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
+       AND created_at < DATE_TRUNC('month', CURRENT_DATE)"
+      : "WHERE api_key_hash IS NULL 
+       AND created_at >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
+       AND created_at < DATE_TRUNC('month', CURRENT_DATE)";
+    const lastMonthParams = identifier.type === 'api_key' ? [identifier.identifier] : [];
     const lastMonth = await db.query(
       `SELECT 
         COUNT(*) as requests_last_month
-       FROM request_logs 
-       WHERE api_key_hash = $1 
-       AND created_at >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
-       AND created_at < DATE_TRUNC('month', CURRENT_DATE)`,
-      [identifier.identifier]
+       FROM request_logs ${lastMonthWhereClause}`,
+      lastMonthParams
     );
 
     // Get rate limit info from rate limiter
