@@ -429,15 +429,15 @@ app.get('/', (req, res) => {
   <div class="features">
     <div class="feature">
       <h3>🚀 Fast Performance</h3>
-      <p>Sub-5ms response times for each transformation</p>
+      <p>Average response times of 4-7ms per transformation</p>
     </div>
     <div class="feature">
       <h3>🔗 Chained Operations</h3>
       <p>Combine multiple transformations in one request</p>
     </div>
     <div class="feature">
-      <h3>🔒 Rate Limiting</h3>
-      <p>Built-in protection with generous free tier</p>
+      <h3>🔒 Smart Rate Limiting</h3>
+      <p>Free: 1,000 req/day | Pro: 50,000 req/day with API key</p>
     </div>
   </div>
 
@@ -445,8 +445,8 @@ app.get('/', (req, res) => {
   <ul>
     <li><a href="/health">GET /health</a> - Health check</li>
     <li><a href="/transform?text=Hello%20World&action=slugify">GET /transform</a> - Single transformation</li>
-    <li><a href="/batch">POST /batch</a> - Batch processing</li>
-    <li><a href="/stats">GET /stats</a> - API statistics</li>
+    <li><a href="/batch">POST /batch</a> - Batch processing (multiple texts at once)</li>
+    <li><a href="/stats">GET /stats</a> - API statistics & usage analytics</li>
   </ul>
 
   <h2>Quick Example</h2>
