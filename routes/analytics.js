@@ -15,7 +15,8 @@ async function getIdentifierFromRequest(req) {
   if (apiKey) {
     const validation = await validateApiKey(apiKey);
     if (validation.valid && validation.keyHash) {
-      return { type: 'api_key', identifier: `api:${validation.keyHash}` };
+      // Return just the hash (matches what's stored in request_logs.api_key_hash)
+      return { type: 'api_key', identifier: validation.keyHash };
     }
   }
   
@@ -209,7 +210,9 @@ router.get('/analytics/usage', async (req, res) => {
     let rateLimitInfo = null;
     
     if (identifier.type === 'api_key') {
-      const keyEntry = rateStats.entries?.find(e => e.key === identifier.identifier);
+      // Rate limiter stores keys with 'api:' prefix
+      const rateLimitKey = `api:${identifier.identifier}`;
+      const keyEntry = rateStats.entries?.find(e => e.key === rateLimitKey);
       if (keyEntry) {
         rateLimitInfo = {
           limit: keyEntry.count > 25000 ? 50000 : 1000, // rough heuristic
