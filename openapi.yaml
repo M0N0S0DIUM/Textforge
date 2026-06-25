@@ -208,6 +208,37 @@ paths:
         '429':
           description: Rate limit exceeded
 
+  /v1/run:
+    post:
+      summary: Execute Transformation Pipeline
+      description: |
+        Execute a pipeline of transformations in sequence, where each step's output
+        becomes the next step's input. This is the core "pipeline engine" endpoint.
+        
+        Each transformation in the pipeline receives the output of the previous
+        transformation as its input. The final result is returned along with
+        detailed step-by-step execution information.
+      operationId: runPipeline
+      tags:
+        - Transformations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PipelineRequest'
+      responses:
+        '200':
+          description: Pipeline executed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineResponse'
+        '400':
+          description: Invalid request parameters
+        '429':
+          description: Rate limit exceeded
+
   /batch:
     post:
       summary: Batch Text Processing
@@ -443,6 +474,90 @@ components:
         resetAt:
           type: integer
           format: unix-time
+
+
+    PipelineRequest:
+      type: object
+      required:
+        - input
+        - pipeline
+      properties:
+        input:
+          type: string
+          example: "Hello World!"
+          minLength: 1
+          maxLength: 10485760
+          description: The input text to process through the pipeline
+        pipeline:
+          type: array
+          items:
+            type: string
+            enum: [slugify, camelcase, snakecase, kebabcase, pascalcase, constantcase, sentencecase, titlecase, reverse, countwords, removemultiple, removespecial, extractemails, extracturls, extractnumbers, truncate, leet, morse, base64encode, base64decode, hash, random, palindromecheck]
+          minItems: 1
+          maxItems: 20
+          example: ["slugify", "reverse", "base64encode"]
+          description: Ordered list of transformations to apply sequentially
+        limit:
+          type: integer
+          minimum: 1
+          example: 50
+          description: Maximum length for truncate action
+        length:
+          type: integer
+          minimum: 1
+          example: 16
+          description: Length for random string generation
+        type:
+          type: string
+          enum: [alnum, alpha, numeric, hex]
+          default: alnum
+          description: Character set for random string generation
+        webhook:
+          type: string
+          format: uri
+          example: "https://example.com/webhook"
+          description: Optional webhook URL for async result delivery
+
+    PipelineResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        input:
+          type: string
+          example: "Hello World!"
+        pipeline:
+          type: array
+          items:
+            type: string
+          example: ["slugify", "reverse", "base64encode"]
+        result:
+          type: string
+          example: "b2xsZWgtZGxyb3c="
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/PipelineStep'
+        execution_time_ms:
+          type: integer
+          example: 4
+
+    PipelineStep:
+      type: object
+      properties:
+        step:
+          type: integer
+          example: 1
+        action:
+          type: string
+          example: slugify
+        result:
+          type: string
+          example: "hello-world"
+        execution_time_ms:
+          type: integer
+          example: 2
 
 security:
   - ApiKeyAuth: []

@@ -901,6 +901,161 @@ app.post('/transform', async (req, res) => {
   );
 });
 
+
+/**
+ * POST /v1/run - Pipeline execution endpoint
+ * 
+ * This is the "killer feature" - execute a pipeline of transformations
+ * in sequence, where each step's output becomes the next step's input.
+ * 
+ * Body:
+ * {
+ *   "input": "Hello World!",
+ *   "pipeline": ["slugify", "reverse", "base64encode"]
+ * }
+ * 
+ * Returns:
+ * {
+ *   "success": true,
+ *   "input": "Hello World!",
+ *   "pipeline": ["slugify", "reverse", "base64encode"],
+ *   "result": "b2xsZWgtZGxyb3c=",
+ *   "steps": [
+ *     { "step": 1, "action": "slugify", "result": "hello-world", "execution_time_ms": 2 },
+ *     { "step": 2, "action": "reverse", "result": "dlrow-olleh", "execution_time_ms": 1 },
+ *     { "step": 3, "action": "base64encode", "result": "b2xsZWgtZGxyb3c=", "execution_time_ms": 1 }
+ *   ],
+ *   "execution_time_ms": 4
+ * }
+ */
+app.post('/v1/run', async (req, res) => {
+  const startTime = Date.now();
+  const { input, pipeline, limit, length, type, webhook } = req.body;
+
+  // Validate required parameters
+  if (!input || typeof input !== 'string') {
+    const executionTime = Date.now() - startTime;
+    await logRequest(req, { action: 'pipeline', actions: pipeline, text: input?.substring(0, 100) }, 400, executionTime, 0, 0);
+    return res.status(400).json({
+      success: false,
+      error: 'Missing or invalid required field: input (must be a non-empty string)',
+      status: 400
+    });
+  }
+
+  if (!pipeline || !Array.isArray(pipeline) || pipeline.length === 0) {
+    const executionTime = Date.now() - startTime;
+    await logRequest(req, { action: 'pipeline', actions: pipeline, text: input?.substring(0, 100) }, 400, executionTime, 0, 0);
+    return res.status(400).json({
+      success: false,
+      error: 'Missing or invalid required field: pipeline (must be a non-empty array of actions)',
+      status: 400
+    });
+  }
+
+  // Validate text length
+  const validation = validateText(input);
+  if (!validation.valid) {
+    const executionTime = Date.now() - startTime;
+    await logRequest(req, { action: 'pipeline', actions: pipeline, text: input.substring(0, 100) }, 400, executionTime, input.length, 0);
+    return res.status(400).json({
+      success: false,
+      error: validation.error,
+      status: 400
+    });
+  }
+
+  // Validate all actions exist
+  const availableActions = getAvailableActions();
+  for (const action of pipeline) {
+    if (!availableActions.includes(action)) {
+      const executionTime = Date.now() - startTime;
+      await logRequest(req, { action: 'pipeline', actions: pipeline, text: input.substring(0, 100) }, 400, executionTime, input.length, 0);
+      return res.status(400).json({
+        success: false,
+        error: `Invalid action in pipeline: ${action}`,
+        status: 400
+      });
+    }
+  }
+
+  const params = { limit, length, type };
+  const steps = [];
+  let currentText = input;
+
+  // Execute pipeline sequentially
+  for (let i = 0; i < pipeline.length; i++) {
+    const action = pipeline[i];
+    const stepStartTime = Date.now();
+    
+    const result = await executeTransform(req, currentText, action, params);
+    
+    if (!result) {
+      const executionTime = Date.now() - startTime;
+      await logRequest(req, { action: 'pipeline', actions: pipeline, text: input.substring(0, 100) }, 400, executionTime, input.length, 0);
+      return res.status(400).json({
+        success: false,
+        error: `Invalid action: ${action}`,
+        status: 400
+      });
+    }
+
+    if (result.error) {
+      const executionTime = Date.now() - startTime;
+      await logRequest(req, { action: 'pipeline', actions: pipeline, text: input.substring(0, 100) }, 500, executionTime, input.length, 0);
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+        status: result.status
+      });
+    }
+
+    const stepResult = result.result;
+    steps.push({
+      step: i + 1,
+      action,
+      result: stepResult,
+      execution_time_ms: result.execution_time_ms
+    });
+
+    // Use the result as input for the next step
+    if (typeof stepResult === 'string' || typeof stepResult === 'number') {
+      currentText = String(stepResult);
+    } else if (typeof stepResult === 'object') {
+      // For actions that return objects (countwords, palindromecheck), stringify for next step
+      currentText = JSON.stringify(stepResult);
+    }
+  }
+
+  const executionTime = Date.now() - startTime;
+  const finalResult = currentText;
+
+  // Send webhook if provided
+  if (webhook) {
+    sendWebhook(webhook, {
+      input,
+      pipeline,
+      result: finalResult,
+      steps,
+      execution_time_ms: executionTime
+    });
+  }
+
+  const responseBody = {
+    success: true,
+    input,
+    pipeline,
+    result: finalResult,
+    steps,
+    execution_time_ms: executionTime
+  };
+
+  await logRequest(req, { action: 'pipeline', actions: pipeline, text: input.substring(0, 100) }, 200, executionTime, JSON.stringify(req.body).length, JSON.stringify(responseBody).length);
+
+  res.json(responseBody);
+});
+
+
 /**
  * POST /batch - Batch processing endpoint
  * 
