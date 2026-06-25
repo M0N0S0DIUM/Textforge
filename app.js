@@ -463,11 +463,15 @@ app.get('/', (req, res) => {
     <li><a href="/health">GET /health</a> - Health check</li>
     <li><a href="/transform?text=Hello%20World&action=slugify">GET /transform</a> - Single transformation</li>
     <li><a href="/batch">POST /batch</a> - Batch processing (multiple texts at once)</li>
+    <li><a href="/v1/run">POST /v1/run</a> - Pipeline execution (sequential transformations)</li>
     <li><a href="/stats">GET /stats</a> - API statistics & usage analytics</li>
   </ul>
 
   <h2>Quick Example</h2>
   <div class="code-example">curl "https://textforge.co/transform?text=Hello%20World!&action=slugify"</div>
+
+  <h3>Pipeline Example</h3>
+  <div class="code-example">curl -X POST https://textforge.co/v1/run   -H "Content-Type: application/json"   -d '{"input": "Hello World!", "pipeline": ["slugify", "reverse", "base64encode"]}'</div>
 
   <p><a href="/docs">View API Documentation</a></p>
 </body>

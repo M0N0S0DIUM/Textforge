@@ -262,6 +262,65 @@ curl -X POST http://localhost:3000/batch \
   }'
 ```
 
+#### 4. POST /v1/run
+
+**Pipeline Execution** - Execute a sequence of transformations where each step's output becomes the next step's input. This is the core "pipeline engine" endpoint.
+
+**Request Body:**
+
+```json
+{
+  "input": "Hello World!",
+  "pipeline": ["slugify", "reverse", "base64encode"],
+  "limit": 50,
+  "length": 16,
+  "type": "alnum",
+  "webhook": "https://example.com/webhook"
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `input` | Yes | The text to process through the pipeline |
+| `pipeline` | Yes | Array of transformation actions (1-20 steps) |
+| `limit` | No | For truncate action |
+| `length` | No | For random string generation |
+| `type` | No | Character set for random (alnum, alpha, numeric, hex) |
+| `webhook` | No | URL to POST result to |
+
+**Example:**
+
+```bash
+curl -X POST http://localhost:3000/v1/run   -H "Content-Type: application/json"   -d '{
+    "input": "Hello World!",
+    "pipeline": ["slugify", "reverse", "base64encode"]
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "input": "Hello World!",
+  "pipeline": ["slugify", "reverse", "base64encode"],
+  "result": "ZGxyb3ctb2xsZWg=",
+  "steps": [
+    { "step": 1, "action": "slugify", "result": "hello-world", "execution_time_ms": 2 },
+    { "step": 2, "action": "reverse", "result": "dlrow-olleh", "execution_time_ms": 1 },
+    { "step": 3, "action": "base64encode", "result": "ZGxyb3ctb2xsZWg=", "execution_time_ms": 1 }
+  ],
+  "execution_time_ms": 4
+}
+```
+
+Each step object contains:
+- `step` - Step number (1-indexed)
+- `action` - Transformation action name
+- `result` - Output of this step (becomes next step's input)
+- `execution_time_ms` - Time taken for this step
+
+#### 5. GET /health
 #### 4. GET /health
 
 Health check endpoint.
@@ -429,6 +488,17 @@ Content-Type: application/json
 {
   "items": ["Hello World", "Foo Bar", "Test Case"],
   "action": "slugify"
+}
+```
+
+**6. Pipeline Execution**
+```
+POST {{baseUrl}}/v1/run
+Content-Type: application/json
+
+{
+  "input": "Hello World!",
+  "pipeline": ["slugify", "reverse", "base64encode"]
 }
 ```
 
