@@ -52,6 +52,7 @@ const { initRedis, get: cacheGet, set: cacheSet, clear: cacheClear, generateCach
 // Initialize Express app
 const app = express();
 
+app.set('trust proxy', true);
 // Configuration
 const _parsedPort = parseInt(process.env.PORT, 10);
 const PORT = !isNaN(_parsedPort) ? _parsedPort : 3000;
