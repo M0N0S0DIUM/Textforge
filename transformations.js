@@ -326,11 +326,18 @@ function base64encode(text) {
  * 20. base64decode - Decode Base64 to text
  * "aGVsbG8=" → "hello"
  * @param {string} text - Base64 encoded text
- * @returns {string} Decoded text
+ * @returns {string} Decoded text (empty string for invalid base64)
  */
 function base64decode(text) {
   try {
-    return Buffer.from(text.toString(), 'base64').toString('utf8');
+    const str = text.toString();
+    /* Validate base64 format before decoding to avoid garbage output */
+    /* Valid base64: only A-Z, a-z, 0-9, +, /, = (padding) */
+    /* Length must be multiple of 4 */
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(str) || str.length % 4 !== 0) {
+      return '';
+    }
+    return Buffer.from(str, 'base64').toString('utf8');
   } catch {
     return '';
   }
