@@ -14,7 +14,7 @@ const plans = [
   },
   {
     name: 'Pro',
-    price: '$29',
+    price: '$2.99',
     period: '/month',
     description: 'For production applications',
     features: ['50,000 requests/day', 'Priority support', 'Webhook delivery', 'Custom presets', 'Analytics'],
