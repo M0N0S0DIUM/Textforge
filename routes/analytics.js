@@ -232,9 +232,9 @@ router.get('/analytics/usage', async (req, res) => {
     res.json({
       success: true,
       usage: {
-        today: today.rows[0],
-        thisMonth: currentMonth.rows[0],
-        lastMonth: lastMonth.rows[0],
+        today: parseNumericFields(today.rows[0]),
+        thisMonth: parseNumericFields(currentMonth.rows[0]),
+        lastMonth: parseNumericFields(lastMonth.rows[0]),
         rateLimit: rateLimitInfo
       }
     });
@@ -243,6 +243,20 @@ router.get('/analytics/usage', async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to fetch usage' });
   }
 });
+
+// Helper: Parse numeric string fields from PostgreSQL results to integers
+function parseNumericFields(obj) {
+  if (!obj) return obj;
+  const parsed = { ...obj };
+  for (const key of Object.keys(parsed)) {
+    const val = parsed[key];
+    if (typeof val === 'string' && /^\d+$/.test(val)) {
+      parsed[key] = parseInt(val, 10);
+    }
+  }
+  return parsed;
+}
+
 
 // Admin: Trigger daily rollup manually (for testing)
 router.post('/analytics/rollup', async (req, res) => {
