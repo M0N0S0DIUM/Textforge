@@ -605,10 +605,9 @@ app.get('/', (req, res) => {
         </ul>
         <a href="/dashboard" class="cta-btn secondary">Get Started</a>
       </div>
-      <div class="pricing-card featured">
-        <div style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #3b82f6; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">Most Popular</div>
+      <div class="pricing-card">
         <h3>Pro</h3>
-        <div class="price">$29<span class="price"><span>/month</span></span></div>
+        <div class="price">$2.99<span class="price"><span>/month</span></span></div>
         <p style="color: #888; font-size: 14px; margin-top: 8px;">For production applications</p>
         <ul>
           <li>✓ 50,000 requests/day</li>
