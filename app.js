@@ -370,7 +370,6 @@ async function logRequest(req, { action, actions, text }, statusCode, latencyMs,
     );
   } catch (err) {
     // Don't fail the request if logging fails
-    console.error('Request logging failed:', err.message, err.stack);
     logger.warn('Request logging failed', { error: err.message, stack: err.stack });
   }
 }
