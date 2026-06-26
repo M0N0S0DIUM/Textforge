@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test on Node.js
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: textforge_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/textforge_test
+          REDIS_URL: redis://localhost:6379
+          NODE_ENV: test
+          API_KEY_SECRET: test-secret-key-that-is-at-least-32-characters-long
+          BASE_URL: http://localhost:3000
+          STRIPE_SECRET_KEY: sk_test_doesnotmatter
+          STRIPE_WEBHOOK_SECRET: whsec_doesnotmatter
+          STRIPE_PRO_PRICE_ID: price_test
+          STRIPE_ENTERPRISE_PRICE_ID: price_test
+        run: npm test
+
+      - name: Build dashboard
+        working-directory: ./textforge-dashboard
+        run: |
+          npm ci
+          npm run build
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for linting issues (basic syntax check)
+        run: node --check app.js && node --check transformations.js && node --check rateLimiter.js && node --check db.js && node --check cache.js && node --check logger.js && node --check apiKeys.js
