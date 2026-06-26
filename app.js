@@ -416,76 +416,230 @@ app.get('/', (req, res) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TextForge - Smart Text Utility API</title>
+  <meta name="description" content="23 text transformation utilities through a single, simple API. Slugify, camelcase, morse code, and more.">
   <style>
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 40px 20px;
-      line-height: 1.6;
-      color: #333;
-    }
-    h1 { color: #1a73e8; }
-    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 40px 0; }
-    .feature { padding: 20px; border-radius: 8px; background: #f5f5f5; }
-    a { color: #1a73e8; text-decoration: none; font-weight: bold; }
-    a:hover { text-decoration: underline; }
-    .code-example {
-      background: #2d2d2d;
-      color: #f8f8f2;
-      padding: 20px;
-      border-radius: 8px;
-      font-family: monospace;
-      margin: 20px 0;
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #111; }
+    .nav { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid #eee; }
+    .nav-brand { font-size: 20px; font-weight: 700; color: #3b82f6; text-decoration: none; }
+    .nav-links { display: flex; gap: 16px; }
+    .nav-links a { color: #555; text-decoration: none; font-size: 14px; }
+    .nav-links a:hover { color: #111; }
+    .nav-links .btn { background: #3b82f6; color: white; padding: 8px 16px; border-radius: 6px; }
+    .nav-links .btn:hover { background: #2563eb; color: white; }
+    
+    .hero { text-align: center; padding: 80px 24px 60px; background: linear-gradient(to bottom, #fff, #f8fafc); }
+    .hero-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; background: #eff6ff; color: #1d4ed8; border-radius: 999px; font-size: 14px; font-weight: 500; margin-bottom: 24px; }
+    .hero-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; }
+    .hero h1 { font-size: 48px; font-weight: 800; line-height: 1.1; margin-bottom: 20px; }
+    .hero h1 span { color: #3b82f6; }
+    .hero p { font-size: 20px; color: #555; max-width: 600px; margin: 0 auto 32px; line-height: 1.6; }
+    .hero-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    .btn-primary { background: #3b82f6; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-secondary { background: white; color: #3b82f6; border: 2px solid #3b82f6; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; }
+    .btn-secondary:hover { background: #eff6ff; }
+    .code-block { background: #1a1a2e; color: #f8f8f8; padding: 16px 24px; border-radius: 8px; font-family: monospace; font-size: 14px; margin-top: 40px; max-width: 700px; margin-left: auto; margin-right: auto; overflow-x: auto; }
+
+    .section { padding: 80px 24px; }
+    .section-title { text-align: center; font-size: 32px; font-weight: 700; margin-bottom: 16px; }
+    .section-subtitle { text-align: center; color: #555; font-size: 18px; max-width: 600px; margin: 0 auto 48px; }
+    
+    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 1000px; margin: 0 auto; }
+    .feature-card { padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; transition: box-shadow 0.2s; }
+    .feature-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .feature-icon { font-size: 24px; margin-bottom: 12px; }
+    .feature-card h3 { font-size: 18px; margin-bottom: 8px; }
+    .feature-card p { color: #555; font-size: 14px; line-height: 1.6; }
+
+    .pipeline-section { background: #f8fafc; }
+    .pipeline-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; max-width: 1000px; margin: 0 auto; align-items: center; }
+    .pipeline-code { background: #1a1a2e; color: #f8f8f8; padding: 24px; border-radius: 12px; font-family: monospace; font-size: 13px; overflow-x: auto; line-height: 1.8; }
+    .pipeline-steps { display: flex; flex-direction: column; gap: 12px; }
+    .pipeline-step { padding: 12px 16px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; display: flex; align-items: center; gap: 12px; }
+    .step-num { background: #eff6ff; color: #1d4ed8; padding: 4px 10px; border-radius: 4px; font-weight: 600; font-size: 12px; }
+    .step-action { font-family: monospace; font-weight: 600; color: #3b82f6; }
+
+    .transforms-cloud { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 800px; margin: 0 auto; }
+    .transform-tag { padding: 8px 16px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; font-family: monospace; font-size: 13px; color: #444; }
+
+    .pricing { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 700px; margin: 0 auto; }
+    .pricing-card { padding: 32px; border-radius: 12px; border: 1px solid #e2e8f0; text-align: center; }
+    .pricing-card.featured { border: 2px solid #3b82f6; position: relative; }
+    .pricing-card h3 { font-size: 22px; margin-bottom: 8px; }
+    .price { font-size: 48px; font-weight: 800; color: #111; }
+    .price span { font-size: 16px; font-weight: 400; color: #888; }
+    .pricing-card ul { list-style: none; margin: 24px 0; }
+    .pricing-card li { padding: 8px 0; color: #555; font-size: 14px; }
+    .cta-btn { display: inline-block; margin-top: 16px; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+    .cta-btn.primary { background: #3b82f6; color: white; }
+    .cta-btn.secondary { background: #f1f5f9; color: #333; }
+
+    .cta-section { background: #3b82f6; text-align: center; padding: 80px 24px; }
+    .cta-section h2 { color: white; font-size: 32px; margin-bottom: 16px; }
+    .cta-section p { color: rgba(255,255,255,0.8); font-size: 18px; margin-bottom: 32px; }
+
+    .footer { padding: 32px 24px; border-top: 1px solid #eee; text-align: center; color: #888; font-size: 14px; }
+    .footer a { color: #3b82f6; text-decoration: none; margin: 0 12px; }
+
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 32px; }
+      .pipeline-grid, .pricing { grid-template-columns: 1fr; }
+      .nav-links { gap: 10px; }
+      .nav-links a { font-size: 13px; }
     }
   </style>
 </head>
 <body>
-  <h1>TextForge - Smart Text Utility API</h1>
-  <p>A lightweight REST API providing <strong>23 text transformation utilities</strong> through a single, simple endpoint.</p>
-  
-  <div class="features">
-    <div class="feature">
-      <h3>🚀 Fast Performance</h3>
-      <p>Average response times of 4-7ms per transformation</p>
+  <nav class="nav">
+    <a href="/" class="nav-brand">TextForge</a>
+    <div class="nav-links">
+      <a href="/docs">Docs</a>
+      <a href="/faq">FAQ</a>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/keys">API Keys</a>
+      <a href="/billing" class="btn">Billing</a>
     </div>
-    <div class="feature">
-      <h3>🔗 Chained Operations</h3>
-      <p>Combine multiple transformations in one request</p>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-badge"><span class="dot"></span> Now with 23 text transformations & chaining</div>
+    <h1>The Swiss Army Knife for<br><span>Text Transformations</span></h1>
+    <p>23 text utilities through a single, simple endpoint. Slugify, camelcase, morse code, base64, and more. Chain operations with the /v1/run pipeline endpoint.</p>
+    <div class="hero-actions">
+      <a href="/docs" class="btn-primary">Read the Docs &rarr;</a>
+      <a href="/dashboard" class="btn-secondary">Get API Key</a>
     </div>
-    <div class="feature">
-      <h3>🔒 Smart Rate Limiting</h3>
-      <p>Free: 1,000 req/day | Pro: 50,000 req/day with API key</p>
+    <div class="code-block">curl -X POST https://textforge.co/v1/run -H "Content-Type: application/json" -d '{"input": "Hello World!", "pipeline": ["slugify", "reverse", "base64encode"]}'</div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">Everything You Need</h2>
+    <p class="section-subtitle">From URL slugs to Morse code, TextForge has you covered with fast, reliable text transformations.</p>
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>23 Transformations</h3>
+        <p>From slugify to morse code, all text transformations in one API.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔗</div>
+        <h3>Chain Operations</h3>
+        <p>Combine multiple transformations in a single request for complex operations.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"></div>
+        <h3>Lightning Fast</h3>
+        <p>Optimized for speed with sub-5ms response times for each transformation.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🛡️</div>
+        <h3>Rate Limiting</h3>
+        <p>Built-in rate limiting with generous free tier to protect your usage.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"></div>
+        <h3>Batch Processing</h3>
+        <p>Process up to 100 texts in a single request. Perfect for bulk operations.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔔</div>
+        <h3>Webhook Delivery</h3>
+        <p>Get async delivery of results via webhook. Fire-and-forget processing.</p>
+      </div>
     </div>
-  </div>
+  </section>
 
-  <h2>Available Endpoints</h2>
-  <ul>
-    <li><a href="/health">GET /health</a> - Health check</li>
-    <li><a href="/transform?text=Hello%20World&action=slugify">GET /transform</a> - Single transformation</li>
-    <li><a href="/batch">POST /batch</a> - Batch processing (multiple texts at once)</li>
-    <li><a href="/v1/run">POST /v1/run</a> - Pipeline execution (sequential transformations)</li>
-    <li><a href="/stats">GET /stats</a> - API statistics & usage analytics</li>
-  </ul>
+  <section class="section pipeline-section">
+    <h2 class="section-title">Pipeline Chaining</h2>
+    <p class="section-subtitle">Execute multiple transformations in sequence. Each step feeds into the next.</p>
+    <div class="pipeline-grid">
+      <div>
+        <div class="pipeline-code" style="margin-bottom: 16px;">
+          <strong style="color: #aaa;">Request</strong><br><br>
+          POST /v1/run<br>
+          Content-Type: application/json<br><br>
+          {<br>
+          &nbsp;&nbsp;"input": "Hello World!",<br>
+          &nbsp;&nbsp;"pipeline": ["slugify", "reverse", "base64encode"]<br>
+          }
+        </div>
+        <div class="pipeline-code">
+          <strong style="color: #aaa;">Response</strong><br><br>
+          {<br>
+          &nbsp;&nbsp;"success": true,<br>
+          &nbsp;&nbsp;"result": "ZGxyb3ctb2xsZWg=",<br>
+          &nbsp;&nbsp;"steps": [...]<br>
+          }
+        </div>
+      </div>
+      <div class="pipeline-steps">
+        <div class="pipeline-step"><span class="step-num">Step 1</span><span class="step-action">slugify</span> → hello-world</div>
+        <div class="pipeline-step"><span class="step-num">Step 2</span><span class="step-action">reverse</span> → dlrow-olleh</div>
+        <div class="pipeline-step"><span class="step-num">Step 3</span><span class="step-action">base64encode</span> → ZGxyb3ctb2xsZWg=</div>
+      </div>
+    </div>
+  </section>
 
-  <h2>Quick Example</h2>
-  <div class="code-example">curl "https://textforge.co/transform?text=Hello%20World!&action=slugify"</div>
+  <section class="section">
+    <h2 class="section-title">23 Transformations</h2>
+    <p class="section-subtitle">All available in a single API call</p>
+    <div class="transforms-cloud">
+      <span class="transform-tag">slugify</span><span class="transform-tag">camelcase</span><span class="transform-tag">snakecase</span><span class="transform-tag">kebabcase</span><span class="transform-tag">pascalcase</span><span class="transform-tag">constantcase</span><span class="transform-tag">sentencecase</span><span class="transform-tag">titlecase</span><span class="transform-tag">reverse</span><span class="transform-tag">countwords</span><span class="transform-tag">removemultiple</span><span class="transform-tag">removespecial</span><span class="transform-tag">extractemails</span><span class="transform-tag">extracturls</span><span class="transform-tag">extractnumbers</span><span class="transform-tag">truncate</span><span class="transform-tag">leet</span><span class="transform-tag">morse</span><span class="transform-tag">base64encode</span><span class="transform-tag">base64decode</span><span class="transform-tag">hash</span><span class="transform-tag">random</span><span class="transform-tag">palindromecheck</span>
+    </div>
+  </section>
 
-  <h3>Pipeline Example</h3>
-  <div class="code-example">curl -X POST https://textforge.co/v1/run   -H "Content-Type: application/json"   -d '{"input": "Hello World!", "pipeline": ["slugify", "reverse", "base64encode"]}'</div>
+  <section class="section" style="background: #f8fafc;">
+    <h2 class="section-title">Simple, Transparent Pricing</h2>
+    <p class="section-subtitle">Start free. Upgrade when you need more.</p>
+    <div class="pricing">
+      <div class="pricing-card">
+        <h3>Free</h3>
+        <div class="price">$0<span class="price"><span>/month</span></span></div>
+        <p style="color: #888; font-size: 14px; margin-top: 8px;">Perfect for testing and small projects</p>
+        <ul>
+          <li>✓ 1,000 requests/day</li>
+          <li>✓ All 23 transformations</li>
+          <li>✓ Chaining support</li>
+          <li>✓ Community support</li>
+        </ul>
+        <a href="/dashboard" class="cta-btn secondary">Get Started</a>
+      </div>
+      <div class="pricing-card featured">
+        <div style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #3b82f6; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">Most Popular</div>
+        <h3>Pro</h3>
+        <div class="price">$29<span class="price"><span>/month</span></span></div>
+        <p style="color: #888; font-size: 14px; margin-top: 8px;">For production applications</p>
+        <ul>
+          <li>✓ 50,000 requests/day</li>
+          <li>✓ Priority support</li>
+          <li>✓ Webhook delivery</li>
+          <li>✓ Custom presets</li>
+          <li>✓ Analytics</li>
+        </ul>
+        <a href="/billing" class="cta-btn primary">Upgrade to Pro</a>
+      </div>
+    </div>
+  </section>
 
-  <p><a href="/docs">View API Documentation</a></p>
+  <section class="cta-section">
+    <h2>Ready to get started?</h2>
+    <p>Start with our generous free tier. No credit card required.</p>
+    <a href="/dashboard" class="btn-secondary" style="color: #3b82f6; background: white;">Get Your Free API Key &rarr;</a>
+  </section>
+
+  <footer class="footer">
+    &copy; 2026 TextForge. All rights reserved.
+    <a href="/docs">Docs</a>
+    <a href="mailto:odderonlab@protonmail.com">Support</a>
+  </footer>
 </body>
 </html>`;
   res.setHeader('Content-Type', 'text/html');
   res.status(200).send(html);
 });
 
-/**
- * GET /health - Health check endpoint
- * Returns API status, database status, Redis connectivity, and uptime
- */
- app.get('/health', async (req, res) => {
+app.get('/health', async (req, res) => {
    const uptime = Math.floor((Date.now() - stats.startTime) / 1000);
    const cacheStats = getCacheStats();
 
