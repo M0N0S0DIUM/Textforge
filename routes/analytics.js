@@ -2,13 +2,21 @@ const express = require('express');
 const db = require('../db');
 const logger = require('../logger');
 const { hashApiKey } = require('../apiKeys');
-const { validateApiKey } = require('../rateLimiter');
+const { 
+  validateApiKey, 
+  getClientIP,
+  FREE_TIER_LIMIT,
+  PRO_TIER_LIMIT,
+  FREE_TIER_PER_MINUTE,
+  PRO_TIER_PER_MINUTE
+} = require('../rateLimiter');
 
 const router = express.Router();
 
 const crypto = require('crypto');
 
 // Helper: Get api_key_hash from API key, or ip_hash for anonymous users
+// Uses full SHA-256 hash for consistency with rate limiter
 async function getIdentifierFromRequest(req) {
   const apiKey = req.headers['x-api-key'];
   
@@ -21,8 +29,9 @@ async function getIdentifierFromRequest(req) {
   }
   
   // For anonymous users, use IP hash (stored as just the hash in database)
-  const ip = req.ip || req.connection.remoteAddress || 'unknown';
-  const ipHash = crypto.createHash('sha256').update(ip).digest('hex').substring(0, 16);
+  // Use hardened IP extraction and full SHA-256 hash (not truncated)
+  const ip = getClientIP(req);
+  const ipHash = crypto.createHash('sha256').update(ip).digest('hex');
   return { type: 'ip', identifier: ipHash };
 }
 
@@ -208,23 +217,46 @@ router.get('/analytics/usage', async (req, res) => {
       const rateLimitKey = `api:${identifier.identifier}`;
       const keyEntry = rateStats.entries?.find(e => e.key === rateLimitKey);
       if (keyEntry) {
+        const isPro = keyEntry.count > 25000; // heuristic based on daily count
         rateLimitInfo = {
-          limit: keyEntry.count > 25000 ? 50000 : 1000, // rough heuristic
-          used: keyEntry.count,
-          remaining: Math.max(0, (keyEntry.count > 25000 ? 50000 : 1000) - keyEntry.count),
-          resetAt: keyEntry.resetAt
+          daily: {
+            limit: isPro ? PRO_TIER_LIMIT : FREE_TIER_LIMIT,
+            used: keyEntry.count,
+            remaining: Math.max(0, (isPro ? PRO_TIER_LIMIT : FREE_TIER_LIMIT) - keyEntry.count),
+            resetAt: keyEntry.resetAt
+          },
+          minute: {
+            limit: isPro ? PRO_TIER_PER_MINUTE : FREE_TIER_PER_MINUTE,
+            used: keyEntry.minuteCount || 0,
+            remaining: keyEntry.minuteRemaining || 0,
+            resetAt: keyEntry.minuteResetAt || keyEntry.resetAt
+          },
+          burst: {
+            remaining: keyEntry.burstRemaining || 0
+          }
         };
       }
     } else {
       // For IP-based usage, get from rate limiter using ip:${ipHash} format
-      const ipRateLimitKey = `ip:${identifier.identifier.replace('ip:', '')}`;
+      const ipRateLimitKey = `ip:${identifier.identifier}`;
       const keyEntry = rateStats.entries?.find(e => e.key === ipRateLimitKey);
       if (keyEntry) {
         rateLimitInfo = {
-          limit: 1000, // Free tier for IP-based
-          used: keyEntry.count,
-          remaining: Math.max(0, 1000 - keyEntry.count),
-          resetAt: keyEntry.resetAt
+          daily: {
+            limit: FREE_TIER_LIMIT,
+            used: keyEntry.count,
+            remaining: Math.max(0, FREE_TIER_LIMIT - keyEntry.count),
+            resetAt: keyEntry.resetAt
+          },
+          minute: {
+            limit: FREE_TIER_PER_MINUTE,
+            used: keyEntry.minuteCount || 0,
+            remaining: keyEntry.minuteRemaining || 0,
+            resetAt: keyEntry.minuteResetAt || keyEntry.resetAt
+          },
+          burst: {
+            remaining: keyEntry.burstRemaining || 0
+          }
         };
       }
     }
