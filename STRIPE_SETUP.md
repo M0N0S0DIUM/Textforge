@@ -6,7 +6,7 @@ This guide covers everything you need to configure Stripe for TextForge.
 
 ## 1. Create Products & Prices
 
-### Pro Plan – $29 / month
+### Pro Plan – $2.99 / month
 
 1. Go to [Stripe Dashboard → Products](https://dashboard.stripe.com/products) and click **+ Add product**.
 2. Fill in:
@@ -14,7 +14,7 @@ This guide covers everything you need to configure Stripe for TextForge.
    - **Description**: 50,000 requests/day, webhooks, analytics
 3. Under **Pricing**, click **+ Add a price**:
    - Pricing model: **Standard pricing**
-   - Price: `$29.00` USD
+   - Price: `$2.99` USD
    - Billing period: **Monthly**
 4. Click **Save product**.
 5. Copy the **Price ID** (e.g. `price_1ABC...`) and save it as `STRIPE_PRO_PRICE_ID`.

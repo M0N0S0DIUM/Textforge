@@ -20,7 +20,7 @@ const plans = [
     features: ['50,000 requests/day', 'Priority support', 'Webhook delivery', 'Custom presets', 'Analytics'],
     cta: 'Upgrade to Pro',
     href: '/billing',
-    highlight: true,
+    highlight: false,
   },
 ];
 
@@ -36,15 +36,9 @@ export default function Pricing() {
           {plans.map((plan) => (
             <div
               key={plan.name}
-              className={`card flex flex-col ${plan.highlight ? 'ring-2 ring-primary-600' : ''}`}
+              className={`card flex flex-col`}
             >
-              {plan.highlight && (
-                <div className="text-center mb-4">
-                  <span className="px-3 py-1 text-xs font-semibold text-primary-700 bg-primary-100 rounded-full">
-                    Most Popular
-                  </span>
-                </div>
-              )}
+
               <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
               <div className="mt-2 mb-1">
                 <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
@@ -62,7 +56,7 @@ export default function Pricing() {
               <Link
                 href={plan.href}
                 className={`w-full text-center py-3 px-4 rounded-lg font-medium transition-colors ${
-                  plan.highlight
+                  plan.name === 'Pro'
                     ? 'bg-primary-600 text-white hover:bg-primary-700'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
