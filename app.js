@@ -772,7 +772,7 @@ if (fs.existsSync(staticDir)) {
 async function processTransformRequest(req, { text, action, actions, preview, preset, limit, length, type, webhook }, res) {
   const startTime = Date.now();
   // Validate required parameters
-  if (!text) {
+  if (text === undefined || text === null) {
     const executionTime = Date.now() - startTime;
     await logRequest(req, { action: null, actions: null, text: '' }, 400, executionTime, 0, 0);
     return res.status(400).json({
