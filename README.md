@@ -195,8 +195,8 @@ curl "http://localhost:3000/transform?text=Hello%20World!&preset=url"
 # Truncate
 curl "http://localhost:3000/transform?text=Hello%20World!&action=truncate&limit=5"
 
-# Random string
-curl "http://localhost:3000/transform?text=&action=random&length=10&type=alnum"
+# Random string (the text value is ignored, but a non-empty value is required)
+curl "http://localhost:3000/transform?text=example&action=random&length=10&type=alnum"
 ```
 
 #### 2. POST /transform
