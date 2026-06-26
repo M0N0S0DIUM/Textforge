@@ -72,6 +72,9 @@ export default function Docs() {
           <p className="text-xs font-semibold text-gray-400 uppercase mt-4 mb-2">API Reference</p>
           <button onClick={() => setActiveTab('endpoints')} className="w-full text-left py-2 px-3 rounded hover:bg-gray-50">Endpoints</button>
           <button onClick={() => setActiveTab('transformations')} className="w-full text-left py-2 px-3 rounded hover:bg-gray-50">Transformations</button>
+          <button onClick={() => setActiveTab('chaining')} className="w-full text-left py-2 px-3 rounded hover:bg-gray-50">Chaining & Pipelines</button>
+          <p className="text-xs font-semibold text-gray-400 uppercase mt-4 mb-2">Advanced</p>
+          <button onClick={() => setActiveTab('batch')} className="w-full text-left py-2 px-3 rounded hover:bg-gray-50">Batch Processing</button>
         </nav>
       </aside>
       <div className="flex-1 px-4 sm:px-6 lg:px-8 py-8">
@@ -127,6 +130,95 @@ export default function Docs() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+        {activeTab === 'chaining' && (
+          <div className="max-w-3xl">
+            <h1 className="text-3xl font-bold text-gray-900 mb-6">Chaining & Pipelines</h1>
+            <p className="text-gray-600 mb-4">Execute multiple transformations in sequence. Each step feeds into the next.</p>
+            <h2 className="text-xl font-semibold mt-6 mb-3">How It Works</h2>
+            <p className="text-gray-600 mb-4">The <code className="px-1 bg-gray-100 rounded">/v1/run</code> endpoint accepts an input string and an array of actions. Each action transforms the output of the previous step.</p>
+            <h2 className="text-xl font-semibold mt-6 mb-3">Request</h2>
+            <div className="code-block mb-4">
+              <pre>{`POST /v1/run
+Content-Type: application/json
+X-API-Key: tf_pro_xxxxx
+
+{
+  "input": "Hello World!",
+  "pipeline": ["slugify", "reverse", "base64encode"]
+}`}</pre>
+            </div>
+            <h2 className="text-xl font-semibold mt-6 mb-3">Response</h2>
+            <div className="code-block mb-4">
+              <pre>{`{
+  "success": true,
+  "input": "Hello World!",
+  "pipeline": ["slugify", "reverse", "base64encode"],
+  "result": "ZGxyb3ctb2xsZWg=",
+  "steps": [
+    { "step": 1, "action": "slugify", "result": "hello-world" },
+    { "step": 2, "action": "reverse", "result": "dlrow-olleh" },
+    { "step": 3, "action": "base64encode", "result": "ZGxyb3ctb2xsZWg=" }
+  ],
+  "execution_time_ms": 4
+}`}</pre>
+            </div>
+            <h2 className="text-xl font-semibold mt-6 mb-3">Common Pipeline Recipes</h2>
+            <div className="space-y-3">
+              <div className="card">
+                <code className="text-primary-600 font-semibold">URL Slugifier</code>
+                <p className="text-sm text-gray-500 mt-1">["removemultiple", "slugify", "kebabcase"]</p>
+              </div>
+              <div className="card">
+                <code className="text-primary-600 font-semibold">Text Cleaner</code>
+                <p className="text-sm text-gray-500 mt-1">["removespecial", "removemultiple", "sentencecase"]</p>
+              </div>
+              <div className="card">
+                <code className="text-primary-600 font-semibold">Encode Pipeline</code>
+                <p className="text-sm text-gray-500 mt-1">["slugify", "base64encode"]</p>
+              </div>
+            </div>
+            <h2 className="text-xl font-semibold mt-6 mb-3">Webhooks</h2>
+            <p className="text-gray-600 mb-4">Add a <code className="px-1 bg-gray-100 rounded">webhook</code> URL to get async delivery of results:</p>
+            <div className="code-block mb-4">
+              <pre>{`{
+  "input": "Hello World",
+  "pipeline": ["slugify", "hash"],
+  "webhook": "https://your-app.com/webhook"
+}`}</pre>
+            </div>
+          </div>
+        )}
+        {activeTab === 'batch' && (
+          <div className="max-w-3xl">
+            <h1 className="text-3xl font-bold text-gray-900 mb-6">Batch Processing</h1>
+            <p className="text-gray-600 mb-4">Process multiple texts in a single request. Perfect for transforming arrays of data.</p>
+            <h2 className="text-xl font-semibold mt-6 mb-3">Request</h2>
+            <div className="code-block mb-4">
+              <pre>{`POST /batch
+Content-Type: application/json
+
+{
+  "texts": ["Hello World", "Foo Bar", "Test 123"],
+  "action": "slugify"
+}`}</pre>
+            </div>
+            <h2 className="text-xl font-semibold mt-6 mb-3">Response</h2>
+            <div className="code-block mb-4">
+              <pre>{`{
+  "success": true,
+  "results": ["hello-world", "foo-bar", "test-123"]
+}`}</pre>
+            </div>
+            <h2 className="text-xl font-semibold mt-6 mb-3">Limits</h2>
+            <div className="card">
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li className="flex items-center"><span className="w-2 h-2 bg-primary-500 rounded-full mr-2"></span>Max 100 texts per request</li>
+                <li className="flex items-center"><span className="w-2 h-2 bg-primary-500 rounded-full mr-2"></span>Max 10MB total payload</li>
+                <li className="flex items-center"><span className="w-2 h-2 bg-primary-500 rounded-full mr-2"></span>Same rate limits as single transforms</li>
+              </ul>
             </div>
           </div>
         )}

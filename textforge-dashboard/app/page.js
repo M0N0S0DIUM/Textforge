@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight, Zap, Shield, Globe, Code2, Link2, Clock, Layers, Cpu, BarChart3, Check, ChevronRight } from 'lucide-react';
 import Pricing from '../components/Pricing';
+import InteractiveDemo from '../components/InteractiveDemo';
 
 const features = [
   {
@@ -87,6 +88,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Interactive Demo */}
+      <InteractiveDemo />
 
       {/* Features Section */}
       <section className="py-24 bg-white">
