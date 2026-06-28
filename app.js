@@ -739,12 +739,121 @@ if (fs.existsSync(dashboardDir)) {
   app.get('/keys', (req, res) => serveDashboardPage(req, res, 'keys'));
   // Serve docs page
   app.get('/docs', (req, res) => serveDashboardPage(req, res, 'docs'));
+  // Serve FAQ page
+  app.get('/faq', (req, res) => serveDashboardPage(req, res, 'faq'));
+  // Serve changelog page
+  app.get('/changelog', (req, res) => serveDashboardPage(req, res, 'changelog'));
 } else {
-  // Dashboard not built yet - redirect to API docs
+  // Dashboard not built yet - serve fallback HTML pages
   app.get('/dashboard', (req, res) => res.redirect('/api-docs'));
   app.get('/billing', (req, res) => res.redirect('/api-docs'));
   app.get('/keys', (req, res) => res.redirect('/api-docs'));
   app.get('/docs', (req, res) => res.redirect('/api-docs'));
+  
+  // FAQ page fallback
+  app.get('/faq', (req, res) => {
+    const html = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>FAQ - TextForge</title>
+        <style>
+          body { font-family: system-ui, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; }
+          h1 { color: #3b82f6; }
+          .question { margin-bottom: 16px; }
+          .question h3 { font-weight: 600; color: #111; }
+          .answer { color: #555; line-height: 1.5; }
+          footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #eee; text-align: center; color: #888; font-size: 14px; }
+          nav { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; }
+          nav a { color: #3b82f6; text-decoration: none; }
+        </style>
+      </head>
+      <body>
+        <nav>
+          <a href="/">TextForge</a>
+          <a href="/docs">Docs</a>
+        </nav>
+        <h1>FAQ</h1>
+        <div class="question">
+          <h3>What is TextForge?</h3>
+          <p class="answer">TextForge provides 23 text transformation utilities through a single API endpoint. Transform text with slugify, camelCase, base64, morse code, and more.</p>
+        </div>
+        <div class="question">
+          <h3>How do I get an API key?</h3>
+          <p class="answer">Sign in to your dashboard and generate an API key. The free tier includes 1,000 requests/day.</p>
+        </div>
+        <div class="question">
+          <h3>What is the rate limit?</h3>
+          <p class="answer">Free tier: 1,000 requests/day. Pro tier: 50,000 requests/day.</p>
+        </div>
+        <div class="question">
+          <h3>Can I chain transformations?</h3>
+          <p class="answer">Yes! Use the /v1/run endpoint with multiple actions in a single request.</p>
+        </div>
+        <footer>
+          &copy; 2026 TextForge. All rights reserved.
+        </footer>
+      </body>
+      </html>`;
+    res.setHeader('Content-Type', 'text/html');
+    res.status(200).send(html);
+  });
+  
+  // Changelog page fallback
+  app.get('/changelog', (req, res) => {
+    const html = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Changelog - TextForge</title>
+        <style>
+          body { font-family: system-ui, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; }
+          h1 { color: #3b82f6; }
+          .release { margin-bottom: 32px; border-left: 4px solid #3b82f6; padding-left: 16px; }
+          .release h2 { font-size: 20px; color: #111; }
+          .version { color: #888; font-size: 14px; margin-bottom: 8px; }
+          .changes li { color: #555; line-height: 1.6; }
+          footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #eee; text-align: center; color: #888; font-size: 14px; }
+          nav { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; }
+          nav a { color: #3b82f6; text-decoration: none; }
+        </style>
+      </head>
+      <body>
+        <nav>
+          <a href="/">TextForge</a>
+          <a href="/docs">Docs</a>
+        </nav>
+        <h1>Changelog</h1>
+        <div class="release">
+          <h2>v1.0.0</h2>
+          <p class="version">Released: 2025-01-15</p>
+          <ul class="changes">
+            <li>Initial release with 23 transformations</li>
+            <li>API key authentication</li>
+            <li>Rate limiting</li>
+          </ul>
+        </div>
+        <div class="release">
+          <h2>v0.9.0</h2>
+          <p class="version">Released: 2024-12-01</p>
+          <ul class="changes">
+            <li>Beta testing</li>
+            <li>Custom presets (Pro)</li>
+            <li>Analytics dashboard</li>
+          </ul>
+        </div>
+        <footer>
+          &copy; 2026 TextForge. All rights reserved.
+        </footer>
+      </body>
+      </html>`;
+    res.setHeader('Content-Type', 'text/html');
+    res.status(200).send(html);
+  });
 }
 
 // Also serve Next.js static assets
