@@ -743,8 +743,11 @@ if (fs.existsSync(dashboardDir)) {
   app.get('/faq', (req, res) => serveDashboardPage(req, res, 'faq'));
   // Serve changelog page
   app.get('/changelog', (req, res) => serveDashboardPage(req, res, 'changelog'));
-} else {
-  // Dashboard not built yet - serve fallback HTML pages
+}
+
+// Always add fallback routes for FAQ and changelog if not built
+if (!fs.existsSync(dashboardDir)) {
+  // Dashboard pages not built yet - redirect to API docs
   app.get('/dashboard', (req, res) => res.redirect('/api-docs'));
   app.get('/billing', (req, res) => res.redirect('/api-docs'));
   app.get('/keys', (req, res) => res.redirect('/api-docs'));
