@@ -1,10 +1,10 @@
 # TextForge - Smart Text Utility API
 
-A lightweight REST API providing **23 text transformation utilities** through a single, simple endpoint. Think of it as a Swiss Army knife for text manipulation that developers can use without installing any libraries.
+A lightweight REST API providing **28 text transformation utilities** through a single, simple endpoint. Think of it as a Swiss Army knife for text manipulation that developers can use without installing any libraries.
 
 ## Features
 
-- **23 Text Transformations**: slugify, camelcase, snakecase, kebabcase, pascalcase, constantcase, sentencecase, titlecase, reverse, countwords, removemultiple, removespecial, extractemails, extracturls, extractnumbers, truncate, leet, morse, base64encode, base64decode, hash, random, palindromecheck
+- **28 Text Transformations**: slugify, camelcase, snakecase, kebabcase, pascalcase, constantcase, sentencecase, titlecase, reverse, countwords, removemultiple, removespecial, extractemails, extracturls, extractnumbers, truncate, leet, morse, base64encode, base64decode, hash, random, palindromecheck, htmlencode, htmldecode, markdownplain, unicodenormalize, trimtext
 - **Chained Transformations**: Combine multiple transformations in a single request
 - **Batch Processing**: Transform multiple texts in one request
 - **Preview Mode**: See all transformations at once

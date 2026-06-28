@@ -405,6 +405,102 @@ function palindromecheck(text) {
 }
 
 /**
+ * 24. htmlencode - Encode text as HTML entities
+ * "Hello <World>" → "Hello &lt;World&gt;"
+ * @param {string} text - Input text
+ * @returns {string} HTML-encoded string
+ */
+function htmlencode(text) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.toString().replace(/[&<>"']/g, c => map[c]);
+}
+
+/**
+ * 25. htmldecode - Decode HTML entities to text
+ * "Hello &lt;World&gt;" → "Hello <World>"
+ * @param {string} text - Input text with HTML entities
+ * @returns {string} Decoded text
+ */
+function htmldecode(text) {
+  const map = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#039;": "'"
+  };
+  return text.toString().replace(/&([^;]+);/g, (match, entity) => map[entity] || match);
+}
+
+/**
+ * 26. markdownplain - Convert markdown to plain text
+ * "# Hello **World**" → "Hello World"
+ * @param {string} text - Input markdown text
+ * @returns {string} Plain text without markdown
+ */
+function markdownplain(text) {
+  let str = text.toString();
+  // Remove headers (# to ######)
+  str = str.replace(/^(#{1,6})\s+/gm, '');
+  // Remove bold/italic markers (* and _)
+  str = str.replace(/[*_]{1,2}/g, '');
+  // Remove code blocks
+  str = str.replace(/`{3}[^`]*`{3}/g, '');
+  // Remove inline code
+  str = str.replace(/`([^`]*)`/g, '$1');
+  // Remove blockquotes
+  str = str.replace(/^\s*>\s*/gm, '');
+  // Remove horizontal rules
+  str = str.replace(/^[-*_]{3,}\s*$/gm, '');
+  // Remove images (keep alt text)
+  str = str.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
+  // Convert links to plain text
+  str = str.replace('\[([^\]]*)\]\([^)]*\)', '$1');
+  // Remove extra whitespace and newlines
+  str = str.replace(/\n{3,}/g, '\n\n');
+  return str.trim();
+}
+
+/**
+ * 27. unicodenormalize - Normalize Unicode text to specified form
+ * @param {string} text - Input text
+ * @param {string} form - Normalization form: 'NFC', 'NFD', 'NFKC', 'NFKD'
+ * @returns {string} Normalized text
+ */
+function unicodenormalize(text, form = 'NFC') {
+  const validForms = ['NFC', 'NFD', 'NFKC', 'NFKD'];
+  if (!validForms.includes(form.toUpperCase())) {
+    return text.toString(); // Return original if invalid form
+  }
+  return text.toString().normalize(form.toUpperCase());
+}
+
+/**
+ * 28. trimtext - Trim whitespace from text with options
+ * @param {string} text - Input text
+ * @param {string} mode - 'both', 'start', or 'end'
+ * @returns {string} Trimmed text
+ */
+function trimtext(text, mode = 'both') {
+  const str = text.toString();
+  switch (mode.toLowerCase()) {
+    case 'start':
+      return str.replace(/^\s+/, '');
+    case 'end':
+      return str.replace(/\s+$/, '');
+    case 'both':
+    default:
+      return str.trim();
+  }
+}
+
+/**
  * Preset definitions - common transformation combinations
  */
 const PRESETS = {
@@ -423,7 +519,8 @@ function getAvailableActions() {
     'constantcase', 'sentencecase', 'titlecase', 'reverse', 'countwords',
     'removemultiple', 'removespecial', 'extractemails', 'extracturls',
     'extractnumbers', 'truncate', 'leet', 'morse', 'base64encode',
-    'base64decode', 'hash', 'random', 'palindromecheck'
+    'base64decode', 'hash', 'random', 'palindromecheck',
+    'htmlencode', 'htmldecode', 'markdownplain', 'unicodenormalize', 'trimtext'
   ];
 }
 
@@ -438,13 +535,14 @@ function getTransformFunction(action) {
     constantcase, sentencecase, titlecase, reverse, countwords,
     removemultiple, removespecial, extractemails, extracturls,
     extractnumbers, truncate, leet, morse, base64encode,
-    base64decode, hash, random, palindromecheck
+    base64decode, hash, random, palindromecheck,
+    htmlencode, htmldecode, markdownplain, unicodenormalize, trimtext
   };
   return actionMap[action] || null;
 }
 
 module.exports = {
-  // All 23 transformation functions
+  // All 28 transformation functions
   slugify,
   camelcase,
   snakecase,
@@ -468,6 +566,11 @@ module.exports = {
   hash,
   random,
   palindromecheck,
+  htmlencode,
+  htmldecode,
+  markdownplain,
+  unicodenormalize,
+  trimtext,
   
   // Utility functions
   validateText,

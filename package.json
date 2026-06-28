@@ -1,7 +1,7 @@
 {
   "name": "textforge",
-  "version": "1.0.0",
-  "description": "Smart Text Utility API - 23 text transformations in a single endpoint",
+  "version": "1.0.1",
+  "description": "Smart Text Utility API - 28 text transformations in a single endpoint",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",

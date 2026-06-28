@@ -121,7 +121,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [slugify, camelcase, snakecase, kebabcase, pascalcase, constantcase, sentencecase, titlecase, reverse, countwords, removemultiple, removespecial, extractemails, extracturls, extractnumbers, truncate, leet, morse, base64encode, base64decode, hash, random, palindromecheck]
+            enum: [slugify, camelcase, snakecase, kebabcase, pascalcase, constantcase, sentencecase, titlecase, reverse, countwords, removemultiple, removespecial, extractemails, extracturls, extractnumbers, truncate, leet, morse, base64encode, base64decode, hash, random, palindromecheck, htmlencode, htmldecode, markdownplain, unicodenormalize, trimtext]
             example: slugify
         - name: actions
           in: query
@@ -265,7 +265,7 @@ paths:
                   maxItems: 100
                 action:
                   type: string
-                  enum: [slugify, camelcase, snakecase, kebabcase, pascalcase, constantcase, sentencecase, titlecase, reverse, countwords, removemultiple, removespecial, extractemails, extracturls, extractnumbers, truncate, leet, morse, base64encode, base64decode, hash, random, palindromecheck]
+                  enum: [slugify, camelcase, snakecase, kebabcase, pascalcase, constantcase, sentencecase, titlecase, reverse, countwords, removemultiple, removespecial, extractemails, extracturls, extractnumbers, truncate, leet, morse, base64encode, base64decode, hash, random, palindromecheck, htmlencode, htmldecode, markdownplain, unicodenormalize, trimtext]
                   example: slugify
                 limit:
                   type: integer
@@ -309,7 +309,7 @@ components:
           maxLength: 10485760
         action:
           type: string
-          enum: [slugify, camelcase, snakecase, kebabcase, pascalcase, constantcase, sentencecase, titlecase, reverse, countwords, removemultiple, removespecial, extractemails, extracturls, extractnumbers, truncate, leet, morse, base64encode, base64decode, hash, random, palindromecheck]
+          enum: [slugify, camelcase, snakecase, kebabcase, pascalcase, constantcase, sentencecase, titlecase, reverse, countwords, removemultiple, removespecial, extractemails, extracturls, extractnumbers, truncate, leet, morse, base64encode, base64decode, hash, random, palindromecheck, htmlencode, htmldecode, markdownplain, unicodenormalize, trimtext]
           example: slugify
         actions:
           type: array
@@ -492,7 +492,7 @@ components:
           type: array
           items:
             type: string
-            enum: [slugify, camelcase, snakecase, kebabcase, pascalcase, constantcase, sentencecase, titlecase, reverse, countwords, removemultiple, removespecial, extractemails, extracturls, extractnumbers, truncate, leet, morse, base64encode, base64decode, hash, random, palindromecheck]
+            enum: [slugify, camelcase, snakecase, kebabcase, pascalcase, constantcase, sentencecase, titlecase, reverse, countwords, removemultiple, removespecial, extractemails, extracturls, extractnumbers, truncate, leet, morse, base64encode, base64decode, hash, random, palindromecheck, htmlencode, htmldecode, markdownplain, unicodenormalize, trimtext]
           minItems: 1
           maxItems: 20
           example: ["slugify", "reverse", "base64encode"]

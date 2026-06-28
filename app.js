@@ -1,7 +1,7 @@
 /**
  * TextForge - Smart Text Utility API
  * 
- * A lightweight REST API providing 23 text transformation utilities
+ * A lightweight REST API providing 28 text transformation utilities
  * through a single, simple endpoint.
  * 
  * Features:
@@ -34,6 +34,7 @@ const {
   removemultiple, removespecial, extractemails, extracturls,
   extractnumbers, truncate, leet, morse, base64encode,
   base64decode, hash, random, palindromecheck,
+  htmlencode, htmldecode, markdownplain, unicodenormalize, trimtext,
   validateText, getAvailableActions, getTransformFunction, PRESETS
 } = require('./transformations');
 const swaggerUi = require('swagger-ui-express');
@@ -495,6 +496,7 @@ app.get('/', (req, res) => {
     <div class="nav-links">
       <a href="/docs">Docs</a>
       <a href="/faq">FAQ</a>
+      <a href="/playground" class="btn">Playground</a>
       <a href="/dashboard">Dashboard</a>
       <a href="/keys">API Keys</a>
       <a href="/billing" class="btn">Billing</a>
@@ -502,12 +504,12 @@ app.get('/', (req, res) => {
   </nav>
 
   <section class="hero">
-    <div class="hero-badge"><span class="dot"></span> Now with 23 text transformations & chaining</div>
+    <div class="hero-badge"><span class="dot"></span> Now with 28 text transformations & chaining</div>
     <h1>The Swiss Army Knife for<br><span>Text Transformations</span></h1>
-    <p>23 text utilities through a single, simple endpoint. Slugify, camelcase, morse code, base64, and more. Chain operations with the /v1/run pipeline endpoint.</p>
+    <p>28 text utilities through a single, simple endpoint. Slugify, camelcase, morse code, base64, HTML encoding, and more. Chain operations with the /v1/run pipeline endpoint.</p>
     <div class="hero-actions">
       <a href="/docs" class="btn-primary">Read the Docs &rarr;</a>
-      <a href="/dashboard" class="btn-secondary">Get API Key</a>
+      <a href="/playground" class="btn-secondary">Try Playground</a>
     </div>
     <div class="code-block">curl -X POST https://textforge.co/v1/run -H "Content-Type: application/json" -d '{"input": "Hello World!", "pipeline": ["slugify", "reverse", "base64encode"]}'</div>
   </section>
@@ -781,7 +783,7 @@ if (!fs.existsSync(dashboardDir)) {
         <h1>FAQ</h1>
         <div class="question">
           <h3>What is TextForge?</h3>
-          <p class="answer">TextForge provides 23 text transformation utilities through a single API endpoint. Transform text with slugify, camelCase, base64, morse code, and more.</p>
+          <p class="answer">TextForge provides 28 text transformation utilities through a single API endpoint. Transform text with slugify, camelCase, base64, morse code, HTML encoding, and more.</p>
         </div>
         <div class="question">
           <h3>How do I get an API key?</h3>
@@ -858,6 +860,243 @@ if (!fs.existsSync(dashboardDir)) {
     res.status(200).send(html);
   });
 }
+
+// Playground page
+app.get('/playground', (req, res) => {
+  const html = `
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TextForge Playground</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #111; }
+    .nav { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid #eee; background: white; }
+    .nav-brand { font-size: 20px; font-weight: 700; color: #3b82f6; text-decoration: none; }
+    .nav-links { display: flex; gap: 24px; }
+    .nav-links a { color: #555; text-decoration: none; font-size: 14px; }
+    .nav-links a:hover { color: #3b82f6; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 40px 24px; }
+    h1 { font-size: 36px; font-weight: 800; margin-bottom: 16px; color: #1e293b; }
+    .subtitle { color: #64748b; font-size: 18px; margin-bottom: 32px; }
+    
+    .playground-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+    @media (max-width: 968px) { .playground-grid { grid-template-columns: 1fr; } }
+    
+    .input-section, .output-section {
+      background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .section-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #334155; }
+    
+    textarea { width: 100%; height: 100px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; font-family: monospace; resize: vertical; }
+    textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+    
+    .controls { margin-top: 20px; }
+    .control-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+    select { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; min-width: 200px; }
+    input[type="text"] { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; min-width: 150px; }
+    .checkbox-group { display: flex; gap: 16px; align-items: center; margin-top: 12px; }
+    .checkbox-label { display: flex; items-align: center; gap: 8px; cursor: pointer; font-size: 14px; color: #334155; }
+    
+    .result-box {
+      background: #f1f5f9; border-radius: 8px; padding: 16px; min-height: 100px;
+      font-family: monospace; white-space: pre-wrap; word-break: break-all; margin-top: 12px;
+    }
+    .result-row { margin-bottom: 16px; }
+    .result-title { font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+    .result-value { font-family: monospace; font-size: 14px; color: #1e293b; word-break: break-all; }
+    
+    .action-btn {
+      background: #3b82f6; color: white; padding: 10px 20px; border-radius: 6px;
+      font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s;
+    }
+    .action-btn:hover { background: #2563eb; }
+    
+    .transformations-list {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-top: 16px;
+    }
+    .transform-tag {
+      padding: 8px 12px; background: #f1f5f9; border-radius: 6px; font-size: 13px;
+      color: #475569; cursor: pointer; transition: all 0.2s; text-align: center;
+    }
+    .transform-tag:hover { background: #e2e8f0; color: #3b82f6; }
+    
+    .execution-time { font-size: 12px; color: #64748b; margin-top: 8px; font-style: italic; }
+    .error { color: #ef4444; }
+    
+    .section { margin-bottom: 32px; }
+    .section h2 { font-size: 24px; font-weight: 700; margin-bottom: 16px; color: #1e293b; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a href="/" class="nav-brand">TextForge Playground</a>
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/docs">Docs</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>TextForge Playground</h1>
+    <p class="subtitle">Test all 28 text transformations in real-time</p>
+    
+    <div class="playground-grid">
+      <div class="input-section">
+        <div class="section-title">Input Text</div>
+        <textarea id="inputText" placeholder="Enter text to transform..."></textarea>
+        
+        <div class="controls">
+          <div class="control-row">
+            <select id="transformationSelect"></select>
+            <button class="action-btn" onclick="transformSingle()">Transform</button>
+            <label class="checkbox-label">
+              <input type="checkbox" id="showAllCheckbox" onchange="toggleShowAll()">
+              Show All Results
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="output-section">
+        <div class="section-title">Result</div>
+        <div id="singleResult" class="result-box">Results will appear here...</div>
+        <div id="executionTime" class="execution-time"></div>
+        
+        <div class="transformations-list" id="allTransformationsList"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Available Transformations</h2>
+      <div class="transformations-list" id="transformationTags"></div>
+    </div>
+  </div>
+
+  <script>
+    const transformations = [
+      'slugify', 'camelcase', 'snakecase', 'kebabcase', 'pascalcase',
+      'constantcase', 'sentencecase', 'titlecase', 'reverse', 'countwords',
+      'removemultiple', 'removespecial', 'extractemails', 'extracturls',
+      'extractnumbers', 'truncate', 'leet', 'morse', 'base64encode',
+      'base64decode', 'hash', 'random', 'palindromecheck',
+      'htmlencode', 'htmldecode', 'markdownplain', 'unicodenormalize', 'trimtext'
+    ];
+
+    // Populate transformation select dropdown
+    const transSelect = document.getElementById('transformationSelect');
+    transformations.forEach(trans => {
+      const option = document.createElement('option');
+      option.value = trans;
+      option.textContent = trans;
+      transSelect.appendChild(option);
+    });
+
+    // Populate transformation tags
+    const tagContainer = document.getElementById('transformationTags');
+    transformations.forEach(trans => {
+      const tag = document.createElement('div');
+      tag.className = 'transform-tag';
+      tag.textContent = trans;
+      tag.onclick = () => {
+        transSelect.value = trans;
+        if (document.getElementById('inputText').value.trim()) {
+          transformSingle();
+        }
+      };
+      tagContainer.appendChild(tag);
+    });
+
+    async function transformSingle() {
+      const text = document.getElementById('inputText').value.trim();
+      const transformation = transSelect.value;
+      
+      if (!text) {
+        alert('Please enter some text to transform');
+        return;
+      }
+
+      const startTime = Date.now();
+      
+      try {
+        const response = await fetch('/transform', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, action: transformation })
+        });
+
+        if (!response.ok) throw new Error('Transform failed');
+        
+        const data = await response.json();
+        const executionTime = Date.now() - startTime;
+        
+        document.getElementById('singleResult').innerHTML = `<div class="result-row">
+          <div class="result-title">Result (${transformation})</div>
+          <div class="result-value">${escapeHtml(data.result)}</div>
+        </div>
+        <div class="execution-time">Execution time: ${executionTime}ms</div>`;
+      } catch (error) {
+        document.getElementById('singleResult').innerHTML = `<div class="result-row">
+          <div class="result-title error">Error</div>
+          <div class="result-value error">${escapeHtml(error.message)}</div>
+        </div>`;
+      }
+    }
+
+    function toggleShowAll() {
+      const showAll = document.getElementById('showAllCheckbox').checked;
+      const inputText = document.getElementById('inputText').value.trim();
+      const listContainer = document.getElementById('allTransformationsList');
+      
+      if (showAll) {
+        if (!inputText) {
+          alert('Please enter some text to transform');
+          document.getElementById('showAllCheckbox').checked = false;
+          return;
+        }
+
+        Promise.all(transformations.map(async trans => {
+          try {
+            const response = await fetch('/transform', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: inputText, action: trans })
+            });
+
+            if (!response.ok) return { transformation: trans, result: null };
+            
+            const data = await response.json();
+            return { transformation: trans, result: data.result };
+          } catch (error) {
+            return { transformation: trans, result: null };
+          }
+        })).then(results => {
+          listContainer.innerHTML = results.map(r => `
+            <div class="result-row">
+              <div class="result-title">${r.transformation}</div>
+              <div class="result-value">${r.result ? escapeHtml(String(r.result)) : 'Error'}</div>
+            </div>
+          `).join('');
+        });
+      } else {
+        listContainer.innerHTML = '';
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>`;
+  res.setHeader('Content-Type', 'text/html');
+  res.status(200).send(html);
+});
 
 // Also serve Next.js static assets
 const staticDir = path.join(__dirname, 'textforge-dashboard', '.next', 'static');
