@@ -405,13 +405,15 @@ app.use('/admin', adminRouter);
 
 // Serve Next.js dashboard static files
 const dashboardBuildPath = path.join(__dirname, 'textforge-dashboard', '.next');
-const dashboardPublicPath = path.join(__dirname, 'textforge-dashboard', 'public');
 
-// Serve static assets (JS, CSS, images)
+// Serve static assets from the root public directory
+const publicPath = path.join(__dirname, 'public');
+app.use('/robots.txt', express.static(path.join(publicPath, 'robots.txt')));
+app.use('/sitemap.xml', express.static(path.join(publicPath, 'sitemap.xml')));
+
+// Serve Next.js static assets (JS, CSS, images)
 app.use('/_next/static', express.static(path.join(dashboardBuildPath, 'static')));
 app.use('/_next/data', express.static(path.join(dashboardBuildPath, 'server', 'app')));
-app.use('/favicon.ico', express.static(path.join(dashboardPublicPath, 'favicon.ico')));
-app.use('/robots.txt', express.static(path.join(dashboardPublicPath, 'robots.txt')));
 
 // Serve Next.js pages via static HTML files
 app.use(express.static(dashboardBuildPath));
@@ -428,7 +430,23 @@ app.get('/', (req, res) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TextForge - Smart Text Utility API</title>
-  <meta name="description" content="23 text transformation utilities through a single, simple API. Slugify, camelcase, morse code, and more.">
+  <meta name="description" content="28 text transformation utilities through a single, simple API. Slugify, camelcase, morse code, and more.">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="canonical" href="https://textforge.co">
+  
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="TextForge - Smart Text Utility API">
+  <meta property="og:description" content="28 text transformation utilities through a single, simple API. Slugify, camelcase, morse code, and more.">
+  <meta property="og:url" content="https://textforge.co">
+  <meta property="og:image" content="https://textforge.co/og-image.png">
+  <meta property="og:site_name" content="TextForge">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="TextForge - Smart Text Utility API">
+  <meta name="twitter:description" content="28 text transformation utilities through a single, simple API. Slugify, camelcase, morse code, and more.">
+  <meta name="twitter:image" content="https://textforge.co/og-image.png">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #111; }
