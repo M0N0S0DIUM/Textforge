@@ -273,7 +273,7 @@ export default function Keys() {
             <ul className="space-y-2 text-sm text-gray-600">
               <li>• 1,000 requests/day</li>
               <li>• No API key required</li>
-              <li>• All 23 transformations</li>
+              <li>• All 28 transformations</li>
             </ul>
           </div>
           <div>

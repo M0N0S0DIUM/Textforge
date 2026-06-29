@@ -3,7 +3,7 @@
 import Link from 'next/link';
 
 const releases = [
-  { version: '1.0.0', date: '2025-01-15', changes: ['Initial release with 23 transformations', 'API key authentication', 'Rate limiting'] },
+  { version: '1.0.0', date: '2025-01-15', changes: ['Initial release with 28 transformations', 'API key authentication', 'Rate limiting'] },
   { version: '0.9.0', date: '2024-12-01', changes: ['Beta testing', 'Custom presets (Pro)', 'Analytics dashboard'] },
 ];
 
