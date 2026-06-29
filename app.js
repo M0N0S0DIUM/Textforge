@@ -1045,9 +1045,16 @@ app.get('/playground', (req, res) => {
         const data = await response.json();
         const executionTime = Date.now() - startTime;
         
-        document.getElementById('singleResult').innerHTML = \`<div class="result-row">\\n          <div class="result-title">Result (${transformation})</div>\\n          <div class="result-value">${escapeHtml(data.result)}</div>\\n        </div>\\n        <div class="execution-time">Execution time: ${executionTime}ms</div>\`;
+        document.getElementById('singleResult').innerHTML = '<div class="result-row">' +
+          '<div class="result-title">Result (' + escapeHtml(transformation) + ')</div>' +
+          '<div class="result-value">' + escapeHtml(String(data.result)) + '</div>' +
+          '</div>' +
+          '<div class="execution-time">Execution time: ' + executionTime + 'ms</div>';
       } catch (error) {
-        document.getElementById('singleResult').innerHTML = \`<div class="result-row">\n          <div class="result-title error">Error</div>\n          <div class="result-value error">${escapeHtml(error.message)}</div>\n        </div>\`;
+        document.getElementById('singleResult').innerHTML = '<div class="result-row">' +
+          '<div class="result-title error">Error</div>' +
+          '<div class="result-value error">' + escapeHtml(error.message) + '</div>' +
+          '</div>';
       }
     }
 
@@ -1079,12 +1086,10 @@ app.get('/playground', (req, res) => {
             return { transformation: trans, result: null };
           }
         })).then(results => {
-          listContainer.innerHTML = results.map(r => \`
-            <div class="result-row">
-              <div class="result-title">${r.transformation}</div>
-              <div class="result-value">${r.result ? escapeHtml(String(r.result)) : 'Error'}</div>
-            </div>
-          \`).join('');
+          listContainer.innerHTML = results.map(r => '<div class="result-row">' +
+            '<div class="result-title">' + r.transformation + '</div>' +
+            '<div class="result-value">' + (r.result ? escapeHtml(String(r.result)) : 'Error') + '</div>' +
+            '</div>').join('');
         });
       } else {
         listContainer.innerHTML = '';
