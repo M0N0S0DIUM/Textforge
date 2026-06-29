@@ -29,7 +29,11 @@ const DAY_IN_MS = 24 * 60 * 60 * 1000;  // 24 hours in milliseconds
 const MINUTE_IN_MS = 60 * 1000;         // 1 minute in milliseconds
 const CLEANUP_INTERVAL = 60 * 60 * 1000; // Clean up every hour
 const PERSISTENCE_INTERVAL = 30 * 1000;  // Persist to disk every 30 seconds
-const PERSISTENCE_FILE = path.join(__dirname, '..', 'data', 'rate-limit-store.json');
+
+// Use /tmp for persistence on Railway (ephemeral but writable) or local data directory
+const isRailway = process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID;
+const PERSISTENCE_DIR = isRailway ? '/tmp' : path.join(__dirname, '..', 'data');
+const PERSISTENCE_FILE = path.join(PERSISTENCE_DIR, 'rate-limit-store.json');
 
 // In-memory rate limit store
 // Structure: Map<identifier, { daily: {count, resetAt}, minute: {timestamps[]}, burst: {tokens, lastRefill} }>

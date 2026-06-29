@@ -21,6 +21,9 @@
  *   - REDIS_URL (optional, for Redis caching)
  */
 
+// Load environment variables from .env file
+require('dotenv').config();
+
 const express = require('express');
 const path = require('path');
 const db = require('./db');
@@ -40,6 +43,7 @@ const {
 const swaggerUi = require('swagger-ui-express');
 const yaml = require('yaml');
 const openapiSpec = yaml.parse(require('fs').readFileSync('./openapi.yaml', 'utf8'));
+const helmet = require('helmet');
 
 const {
   rateLimiterMiddleware,
@@ -53,7 +57,8 @@ const { initRedis, get: cacheGet, set: cacheSet, clear: cacheClear, generateCach
 // Initialize Express app
 const app = express();
 
-app.set('trust proxy', true);
+// Trust Railway's proxy (first proxy in chain only) - prevents IP spoofing for rate limiting
+app.set('trust proxy', 1);
 // Configuration
 const _parsedPort = parseInt(process.env.PORT, 10);
 const PORT = !isNaN(_parsedPort) ? _parsedPort : 3000;
@@ -111,6 +116,13 @@ app.use((req, res, next) => {
 // JSON body parser with size limit
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Security headers with Helmet
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP for API - we want cross-origin access
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
 
 // Request logging middleware with request ID
 app.use((req, res, next) => {
@@ -1033,16 +1045,9 @@ app.get('/playground', (req, res) => {
         const data = await response.json();
         const executionTime = Date.now() - startTime;
         
-        document.getElementById('singleResult').innerHTML = `<div class="result-row">
-          <div class="result-title">Result (${transformation})</div>
-          <div class="result-value">${escapeHtml(data.result)}</div>
-        </div>
-        <div class="execution-time">Execution time: ${executionTime}ms</div>`;
+        document.getElementById('singleResult').innerHTML = \`<div class="result-row">\\n          <div class="result-title">Result (${transformation})</div>\\n          <div class="result-value">${escapeHtml(data.result)}</div>\\n        </div>\\n        <div class="execution-time">Execution time: ${executionTime}ms</div>\`;
       } catch (error) {
-        document.getElementById('singleResult').innerHTML = `<div class="result-row">
-          <div class="result-title error">Error</div>
-          <div class="result-value error">${escapeHtml(error.message)}</div>
-        </div>`;
+        document.getElementById('singleResult').innerHTML = \`<div class="result-row">\n          <div class="result-title error">Error</div>\n          <div class="result-value error">${escapeHtml(error.message)}</div>\n        </div>\`;
       }
     }
 
@@ -1074,12 +1079,12 @@ app.get('/playground', (req, res) => {
             return { transformation: trans, result: null };
           }
         })).then(results => {
-          listContainer.innerHTML = results.map(r => `
+          listContainer.innerHTML = results.map(r => \`
             <div class="result-row">
               <div class="result-title">${r.transformation}</div>
               <div class="result-value">${r.result ? escapeHtml(String(r.result)) : 'Error'}</div>
             </div>
-          `).join('');
+          \`).join('');
         });
       } else {
         listContainer.innerHTML = '';
@@ -1574,21 +1579,22 @@ app.post('/v1/run', async (req, res) => {
  * }
  */
 app.post('/batch', async (req, res) => {
+  const batchStartTime = Date.now();
   const { items, action, limit, length, type, webhook } = req.body;
   
   // Validate required parameters
   if (!items || !Array.isArray(items) || items.length === 0) {
-    const executionTime = Date.now() - startTime;
+    const executionTime = Date.now() - batchStartTime;
     await logRequest(req, { action: 'batch', actions: [action], text: `batch:${items.length}` }, 400, executionTime, 0, 0);
     return res.status(400).json({
       success: false,
       error: 'Missing or invalid field: items (must be a non-empty array)',
-      status: 40000
+      status: 400
     });
   }
 
   if (!action) {
-    const executionTime = Date.now() - startTime;
+    const executionTime = Date.now() - batchStartTime;
     await logRequest(req, { action: 'batch', actions: null, text: `batch:${items.length}` }, 400, executionTime, 0, 0);
     return res.status(400).json({
       success: false,
@@ -1599,7 +1605,7 @@ app.post('/batch', async (req, res) => {
 
   // Validate action exists
   if (!getTransformFunction(action)) {
-    const executionTime = Date.now() - startTime;
+    const executionTime = Date.now() - batchStartTime;
     await logRequest(req, { action: 'batch', actions: [action], text: `batch:${items.length}` }, 400, executionTime, 0, 0);
     return res.status(400).json({
       success: false,
@@ -1608,10 +1614,9 @@ app.post('/batch', async (req, res) => {
     });
   }
 
-  const params = { limit, length, type };
-  const batchStartTime = Date.now();
+    const params = { limit, length, type };
   
-  // Process items in parallel while maintaining order
+    // Process items in parallel while maintaining order
   const results = await Promise.all(
     items.map(async (item, index) => {
       try {

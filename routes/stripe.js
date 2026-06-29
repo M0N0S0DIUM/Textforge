@@ -28,12 +28,10 @@ const keyManagementLimiter = rateLimit({
 // ──────────────────────────────────────────────
 
 // GET /api/keys  — list all API keys
-router.get('/keys', keyManagementLimiter, (req, res) => {
+router.get('/keys', keyManagementLimiter, async (req, res) => {
   try {
-    const keys = db
-      .prepare('SELECT id, key, tier, customer_id, created_at FROM api_keys ORDER BY created_at DESC')
-      .all();
-    res.json({ success: true, keys });
+    const keys = await db.query('SELECT id, key, tier, customer_id, created_at FROM api_keys ORDER BY created_at DESC');
+    res.json({ success: true, keys: keys.rows });
   } catch (error) {
     logger.error('Error fetching API keys', { error: error.message });
     res.status(500).json({ error: 'Failed to fetch API keys' });
@@ -41,24 +39,19 @@ router.get('/keys', keyManagementLimiter, (req, res) => {
 });
 
 // POST /api/keys  — create a new API key (server-side secure generation)
-router.post('/keys', keyManagementLimiter, (req, res) => {
+router.post('/keys', keyManagementLimiter, async (req, res) => {
   try {
     const { customer_id, tier = 'pro' } = req.body || {};
     const apiKey = generateApiKey();
     const apiKeyHash = hashApiKey(apiKey);
 
-    const result = db
-      .prepare(
-        'INSERT INTO api_keys (key, key_hash, customer_id, tier) VALUES (?, ?, ?, ?)'
-      )
-      .run(apiKey, apiKeyHash, customer_id || null, tier);
+    const result = await db.query(
+      'INSERT INTO api_keys (key, key_hash, customer_id, tier) VALUES ($1, $2, $3, $4) RETURNING id, key, tier, customer_id, created_at',
+      [apiKey, apiKeyHash, customer_id || null, tier]
+    );
 
-    const created = db
-      .prepare('SELECT id, key, tier, customer_id, created_at FROM api_keys WHERE id = ?')
-      .get(result.lastInsertRowid);
-
-    logger.info('API key created', { id: created.id, tier });
-    res.status(201).json({ success: true, key: created });
+    logger.info('API key created', { id: result.rows[0].id, tier });
+    res.status(201).json({ success: true, key: result.rows[0] });
   } catch (error) {
     logger.error('Error creating API key', { error: error.message });
     res.status(500).json({ error: 'Failed to create API key' });
@@ -66,11 +59,11 @@ router.post('/keys', keyManagementLimiter, (req, res) => {
 });
 
 // DELETE /api/keys/:id  — revoke an API key by id
-router.delete('/keys/:id', keyManagementLimiter, (req, res) => {
+router.delete('/keys/:id', keyManagementLimiter, async (req, res) => {
   try {
     const { id } = req.params;
-    const result = db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
-    if (result.changes === 0) {
+    const result = await db.query('DELETE FROM api_keys WHERE id = $1', [id]);
+    if (result.rowCount === 0) {
       return res.status(404).json({ error: 'API key not found' });
     }
     logger.info('API key revoked', { id });
@@ -135,9 +128,7 @@ router.get('/billing/status', async (req, res) => {
       return res.status(400).json({ error: 'customerId query parameter required' });
     }
 
-    const customer = db
-      .prepare('SELECT * FROM customers WHERE stripe_customer_id = ?')
-      .get(customerId);
+    const customer = await db.get('SELECT * FROM customers WHERE stripe_customer_id = $1', [customerId]);
 
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
@@ -281,9 +272,10 @@ router.post('/billing/subscription/update', async (req, res) => {
       proration_behavior: 'create_prorations',
     });
 
-    db.prepare(
-      'UPDATE customers SET tier = ?, subscription_status = ?, updated_at = CURRENT_TIMESTAMP WHERE stripe_customer_id = ?'
-    ).run(tier, updated.status, customerId);
+    await db.query(
+      'UPDATE customers SET tier = ?, subscription_status = ?, updated_at = CURRENT_TIMESTAMP WHERE stripe_customer_id = ?',
+      [tier, updated.status, customerId]
+    );
 
     logger.info('Subscription updated', { customerId, tier });
     res.json({ success: true, subscription: { id: updated.id, status: updated.status, tier } });
@@ -302,9 +294,7 @@ router.post('/billing/subscription/cancel', async (req, res) => {
       return res.status(400).json({ error: 'customerId required' });
     }
 
-    const customer = db
-      .prepare('SELECT * FROM customers WHERE stripe_customer_id = ?')
-      .get(customerId);
+    const customer = await db.get('SELECT * FROM customers WHERE stripe_customer_id = $1', [customerId]);
 
     if (!customer || !customer.subscription_id) {
       return res.status(404).json({ error: 'No active subscription found' });
@@ -313,16 +303,18 @@ router.post('/billing/subscription/cancel', async (req, res) => {
     let subscription;
     if (immediately) {
       subscription = await stripe.subscriptions.cancel(customer.subscription_id);
-      db.prepare(
-        'UPDATE customers SET tier = ?, subscription_status = ?, updated_at = CURRENT_TIMESTAMP WHERE stripe_customer_id = ?'
-      ).run('free', 'canceled', customerId);
+      await db.query(
+        'UPDATE customers SET tier = ?, subscription_status = ?, updated_at = CURRENT_TIMESTAMP WHERE stripe_customer_id = ?',
+        ['free', 'canceled', customerId]
+      );
     } else {
       subscription = await stripe.subscriptions.update(customer.subscription_id, {
         cancel_at_period_end: true,
       });
-      db.prepare(
-        'UPDATE customers SET cancel_at_period_end = 1, updated_at = CURRENT_TIMESTAMP WHERE stripe_customer_id = ?'
-      ).run(customerId);
+      await db.query(
+        'UPDATE customers SET cancel_at_period_end = true, updated_at = CURRENT_TIMESTAMP WHERE stripe_customer_id = ?',
+        [customerId]
+      );
     }
 
     logger.info('Subscription cancelled', { customerId, immediately });
@@ -390,26 +382,26 @@ async function dispatchEvent(event) {
       const apiKey = generateApiKey();
       const apiKeyHash = hashApiKey(apiKey);
 
-      const existing = db
-        .prepare('SELECT * FROM customers WHERE stripe_customer_id = ?')
-        .get(session.customer);
+      const existing = await db.get('SELECT * FROM customers WHERE stripe_customer_id = $1', [session.customer]);
 
       if (existing) {
-        db.prepare(
-          'UPDATE customers SET tier = ?, subscription_id = ?, subscription_status = ?, updated_at = CURRENT_TIMESTAMP WHERE stripe_customer_id = ?'
-        ).run(tier, session.subscription, 'active', session.customer);
+        await db.query(
+          'UPDATE customers SET tier = ?, subscription_id = ?, subscription_status = ?, updated_at = CURRENT_TIMESTAMP WHERE stripe_customer_id = ?',
+          [tier, session.subscription, 'active', session.customer]
+        );
       } else {
-        db.prepare(
-          'INSERT INTO customers (stripe_customer_id, email, tier, subscription_id, subscription_status) VALUES (?, ?, ?, ?, ?)'
-        ).run(session.customer, email, tier, session.subscription, 'active');
+        await db.query(
+          'INSERT INTO customers (stripe_customer_id, email, tier, subscription_id, subscription_status) VALUES (?, ?, ?, ?, ?)',
+          [session.customer, email, tier, session.subscription, 'active']
+        );
       }
 
-      db.prepare('INSERT INTO api_keys (key, key_hash, customer_id, tier) VALUES (?, ?, ?, ?)').run(
+      await db.query('INSERT INTO api_keys (key, key_hash, customer_id, tier) VALUES (?, ?, ?, ?)', [
         apiKey,
         apiKeyHash,
         session.customer,
         tier
-      );
+      ]);
 
       logger.info('Checkout completed – API key generated', { customer: session.customer, tier });
       break;
@@ -421,7 +413,7 @@ async function dispatchEvent(event) {
       const sub = event.data.object;
       const tier = sub.metadata?.tier || _tierFromItems(sub);
 
-      db.prepare(
+      await db.query(
         `UPDATE customers SET
           subscription_id = ?,
           subscription_status = ?,
@@ -429,14 +421,15 @@ async function dispatchEvent(event) {
           current_period_end = ?,
           cancel_at_period_end = ?,
           updated_at = CURRENT_TIMESTAMP
-        WHERE stripe_customer_id = ?`
-      ).run(
-        sub.id,
-        sub.status,
-        tier,
-        new Date(sub.current_period_end * 1000).toISOString(),
-        sub.cancel_at_period_end ? 1 : 0,
-        sub.customer
+        WHERE stripe_customer_id = ?`,
+        [
+          sub.id,
+          sub.status,
+          tier,
+          new Date(sub.current_period_end * 1000).toISOString(),
+          sub.cancel_at_period_end ? 1 : 0,
+          sub.customer
+        ]
       );
 
       logger.info('Subscription synced', { customer: sub.customer, status: sub.status, tier });
@@ -447,9 +440,10 @@ async function dispatchEvent(event) {
     case 'customer.subscription.deleted': {
       const sub = event.data.object;
 
-      db.prepare(
-        'UPDATE customers SET tier = ?, subscription_status = ?, cancel_at_period_end = 0, updated_at = CURRENT_TIMESTAMP WHERE stripe_customer_id = ?'
-      ).run('free', 'canceled', sub.customer);
+      await db.query(
+        'UPDATE customers SET tier = ?, subscription_status = ?, cancel_at_period_end = 0, updated_at = CURRENT_TIMESTAMP WHERE stripe_customer_id = ?',
+        ['free', 'canceled', sub.customer]
+      );
 
       logger.info('Subscription deleted', { customer: sub.customer });
       break;
@@ -458,7 +452,7 @@ async function dispatchEvent(event) {
     // ── Invoice paid ──
     case 'invoice.paid': {
       const invoice = event.data.object;
-      _upsertInvoice(invoice, 'paid');
+      await _upsertInvoice(invoice, 'paid');
       logger.info('Invoice paid', { invoiceId: invoice.id, customer: invoice.customer });
       break;
     }
@@ -466,11 +460,12 @@ async function dispatchEvent(event) {
     // ── Invoice payment failed ──
     case 'invoice.payment_failed': {
       const invoice = event.data.object;
-      _upsertInvoice(invoice, 'payment_failed');
+      await _upsertInvoice(invoice, 'payment_failed');
 
-      db.prepare(
-        'UPDATE customers SET tier = ?, subscription_status = ?, updated_at = CURRENT_TIMESTAMP WHERE stripe_customer_id = ?'
-      ).run('free', 'past_due', invoice.customer);
+      await db.query(
+        'UPDATE customers SET tier = ?, subscription_status = ?, updated_at = CURRENT_TIMESTAMP WHERE stripe_customer_id = ?',
+        ['free', 'past_due', invoice.customer]
+      );
 
       logger.warn('Invoice payment failed – downgraded to free', { customer: invoice.customer });
       break;
@@ -480,7 +475,7 @@ async function dispatchEvent(event) {
     case 'invoice.created':
     case 'invoice.finalized': {
       const invoice = event.data.object;
-      _upsertInvoice(invoice, invoice.status);
+      await _upsertInvoice(invoice, invoice.status);
       break;
     }
 
@@ -490,38 +485,38 @@ async function dispatchEvent(event) {
 }
 
 // Persist invoice data locally
-function _upsertInvoice(invoice, status) {
-  const existing = db
-    .prepare('SELECT id FROM invoices WHERE stripe_invoice_id = ?')
-    .get(invoice.id);
+async function _upsertInvoice(invoice, status) {
+  const existing = await db.get('SELECT id FROM invoices WHERE stripe_invoice_id = $1', [invoice.id]);
 
   if (existing) {
-    db.prepare(
-      'UPDATE invoices SET status = ?, amount_paid = ?, amount_due = ?, invoice_pdf = ?, hosted_invoice_url = ? WHERE stripe_invoice_id = ?'
-    ).run(
-      status,
-      invoice.amount_paid || 0,
-      invoice.amount_due || 0,
-      invoice.invoice_pdf || null,
-      invoice.hosted_invoice_url || null,
-      invoice.id
+    await db.query(
+      'UPDATE invoices SET status = ?, amount_paid = ?, amount_due = ?, invoice_pdf = ?, hosted_invoice_url = ? WHERE stripe_invoice_id = ?',
+      [
+        status,
+        invoice.amount_paid || 0,
+        invoice.amount_due || 0,
+        invoice.invoice_pdf || null,
+        invoice.hosted_invoice_url || null,
+        invoice.id
+      ]
     );
   } else {
-    db.prepare(
+    await db.query(
       `INSERT INTO invoices
         (stripe_invoice_id, stripe_customer_id, amount_paid, amount_due, currency, status, invoice_pdf, hosted_invoice_url, period_start, period_end)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      invoice.id,
-      invoice.customer,
-      invoice.amount_paid || 0,
-      invoice.amount_due || 0,
-      invoice.currency || 'usd',
-      status,
-      invoice.invoice_pdf || null,
-      invoice.hosted_invoice_url || null,
-      invoice.period_start ? new Date(invoice.period_start * 1000).toISOString() : null,
-      invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        invoice.id,
+        invoice.customer,
+        invoice.amount_paid || 0,
+        invoice.amount_due || 0,
+        invoice.currency || 'usd',
+        status,
+        invoice.invoice_pdf || null,
+        invoice.hosted_invoice_url || null,
+        invoice.period_start ? new Date(invoice.period_start * 1000).toISOString() : null,
+        invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null
+      ]
     );
   }
 }
