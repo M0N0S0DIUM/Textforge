@@ -1,7 +1,7 @@
 /**
  * TextForge - Text Transformations Module
  * 
- * Provides 23 text transformation utilities used by the TextForge API.
+ * Provides 28 text transformation utilities used by the TextForge API.
  * Each function is pure (no side effects) and takes text as input,
  * returning the transformed result.
  * 
