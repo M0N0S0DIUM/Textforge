@@ -402,6 +402,11 @@ curl http://localhost:3000/stats
 | 21 | `hash` | `"hello"` | `"2cf24dba5..."` (SHA-256) |
 | 22 | `random` | (length=10, type=alnum) | `"aB3xY9zK2m"` |
 | 23 | `palindromecheck` | `"A man a plan a canal Panama"` | `{ palindrome: true, normalized: "amanaplanacanalpanama" }` |
+| 24 | `htmlencode` | `"Hello <World>"` | `"Hello &lt;World&gt;` (HTML entities) |
+| 25 | `htmldecode` | `"Hello &lt;World&gt;` | `"Hello <World>` (decodes HTML) |
+| 26 | `markdownplain` | `"# Hello **World**"` | `"Hello World` (removes markdown) |
+| 27 | `unicodenormalize` | `"café"` + form=NFC | Normalized Unicode string |
+| 28 | `trimtext` | `"   hello world   "` | `"hello world` (whitespace trimmed) |
 
 ## Presets
 
