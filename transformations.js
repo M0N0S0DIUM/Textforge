@@ -429,11 +429,11 @@ function htmlencode(text) {
  */
 function htmldecode(text) {
   const map = {
-    '&amp;': '&',
-    '&lt;': '<',
-    '&gt;': '>',
-    '&quot;': '"',
-    '&#039;": "'"
+    'amp': '&',
+    'lt': '<',
+    'gt': '>',
+    'quot': '"',
+    '#039': "'"
   };
   return text.toString().replace(/&([^;]+);/g, (match, entity) => map[entity] || match);
 }
