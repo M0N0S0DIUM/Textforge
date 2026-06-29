@@ -107,9 +107,17 @@ router.post('/create-checkout-session', async (req, res) => {
         email: email || customer.email,
         tier,
       },
+      // Allow promotion codes
+      allow_promotion_codes: true,
+      // Collect billing address
+      billing_address_collection: 'required',
     });
 
-    res.json({ sessionId: session.id, customerId: customer.id });
+    res.json({ 
+      sessionId: session.id, 
+      customerId: customer.id,
+      checkoutUrl: session.url  // Return the Stripe Checkout URL directly
+    });
   } catch (error) {
     logger.error('Error creating checkout session', { error: error.message });
     res.status(500).json({ error: 'Failed to create checkout session' });
@@ -131,7 +139,40 @@ router.get('/billing/status', async (req, res) => {
     const customer = await db.get('SELECT * FROM customers WHERE stripe_customer_id = $1', [customerId]);
 
     if (!customer) {
-      return res.status(404).json({ error: 'Customer not found' });
+      // Customer not in DB yet (webhook hasn't fired) - fetch from Stripe directly
+      try {
+        const stripeCustomer = await stripe.customers.retrieve(customerId);
+        if (stripeCustomer.deleted) {
+          return res.status(404).json({ error: 'Customer not found' });
+        }
+        
+        // Try to get subscription from Stripe
+        let subscription = null;
+        let tier = 'free';
+        let subscriptionStatus = 'inactive';
+        let currentPeriodEnd = null;
+        let cancelAtPeriodEnd = false;
+
+        if (stripeCustomer.subscriptions?.data?.length > 0) {
+          subscription = stripeCustomer.subscriptions.data[0];
+          tier = subscription.metadata?.tier || 'pro';
+          subscriptionStatus = subscription.status;
+          currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString();
+          cancelAtPeriodEnd = subscription.cancel_at_period_end;
+        }
+
+        return res.json({
+          customerId: stripeCustomer.id,
+          email: stripeCustomer.email,
+          tier,
+          subscriptionStatus,
+          currentPeriodEnd,
+          cancelAtPeriodEnd,
+          pending: true // Indicates webhook hasn't synced yet
+        });
+      } catch (stripeErr) {
+        return res.status(404).json({ error: 'Customer not found' });
+      }
     }
 
     // Fetch live subscription from Stripe when a subscription_id is stored
