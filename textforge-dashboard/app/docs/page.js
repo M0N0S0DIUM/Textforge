@@ -96,25 +96,16 @@ echo $response;
                 <code className="text-sm font-mono text-gray-900">constantcase</code>
               </div>
               <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                <code className="text-sm font-mono text-gray-900">uppercase</code>
-              </div>
-              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                <code className="text-sm font-mono text-gray-900">lowercase</code>
+                <code className="text-sm font-mono text-gray-900">sentencecase</code>
               </div>
               <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                 <code className="text-sm font-mono text-gray-900">titlecase</code>
               </div>
               <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                <code className="text-sm font-mono text-gray-900">sentencecase</code>
-              </div>
-              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                <code className="text-sm font-mono text-gray-900">capitalize</code>
-              </div>
-              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                 <code className="text-sm font-mono text-gray-900">reverse</code>
               </div>
               <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                <code className="text-sm font-mono text-gray-900">truncate</code>
+                <code className="text-sm font-mono text-gray-900">countwords</code>
               </div>
               <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                 <code className="text-sm font-mono text-gray-900">removemultiple</code>
@@ -132,19 +123,13 @@ echo $response;
                 <code className="text-sm font-mono text-gray-900">extractnumbers</code>
               </div>
               <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                <code className="text-sm font-mono text-gray-900">countwords</code>
-              </div>
-              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                <code className="text-sm font-mono text-gray-900">countchars</code>
-              </div>
-              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                <code className="text-sm font-mono text-gray-900">palindromecheck</code>
+                <code className="text-sm font-mono text-gray-900">truncate</code>
               </div>
               <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                 <code className="text-sm font-mono text-gray-900">leet</code>
               </div>
               <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                <code className="text-sm font-mono text-gray-900">morsecode</code>
+                <code className="text-sm font-mono text-gray-900">morse</code>
               </div>
               <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                 <code className="text-sm font-mono text-gray-900">base64encode</code>
@@ -153,13 +138,28 @@ echo $response;
                 <code className="text-sm font-mono text-gray-900">base64decode</code>
               </div>
               <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                <code className="text-sm font-mono text-gray-900">urlencode</code>
+                <code className="text-sm font-mono text-gray-900">hash</code>
               </div>
               <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                <code className="text-sm font-mono text-gray-900">urldecode</code>
+                <code className="text-sm font-mono text-gray-900">random</code>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <code className="text-sm font-mono text-gray-900">palindromecheck</code>
               </div>
               <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                 <code className="text-sm font-mono text-gray-900">htmlencode</code>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <code className="text-sm font-mono text-gray-900">htmldecode</code>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <code className="text-sm font-mono text-gray-900">markdownplain</code>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <code className="text-sm font-mono text-gray-900">unicodenormalize</code>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <code className="text-sm font-mono text-gray-900">trimtext</code>
               </div>
             </div>
           </section>

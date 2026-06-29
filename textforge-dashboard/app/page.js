@@ -1,142 +1,107 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { 
-  Layers, Code2, Zap, ArrowRight, Terminal, BookOpen, 
-  CheckCircle2, Globe, Shield, Settings2, Database, 
-  GitBranch, Clock, Users, Star
-} from 'lucide-react';
-import Navbar from '../components/navbar';
+import { ArrowRight, Zap, Shield, Globe, Code2, Link2, Clock, Layers, Cpu, BarChart3, Check, ChevronRight } from 'lucide-react';
+import Pricing from '../components/Pricing';
+import InteractiveDemo from '../components/InteractiveDemo';
+
+const features = [
+  {
+    icon: <Zap className="w-6 h-6" />,
+    title: '28 Transformations',
+    description: 'From slugify to morse code, all text transformations in one API.'
+  },
+  {
+    icon: <Code2 className="w-6 h-6" />,
+    title: 'Developer First',
+    description: 'Simple REST API, comprehensive docs, and code examples in every language.'
+  },
+  {
+    icon: <Layers className="w-6 h-6" />,
+    title: 'Chain Operations',
+    description: 'Combine multiple transformations in a single request for complex operations.'
+  },
+  {
+    icon: <Cpu className="w-6 h-6" />,
+    title: 'Lightning Fast',
+    description: 'Optimized for speed with sub-5ms response times for each transformation.'
+  },
+  {
+    icon: <Shield className="w-6 h-6" />,
+    title: 'Rate Limiting',
+    description: 'Built-in rate limiting with generous free tier to protect your usage.'
+  },
+  {
+    icon: <Globe className="w-6 h-6" />,
+    title: 'Global Edge',
+    description: 'Deployed globally for low latency no matter where your users are.'
+  }
+];
 
 const transformations = [
   'slugify', 'camelcase', 'snakecase', 'kebabcase', 'pascalcase', 'constantcase',
-  'uppercase', 'lowercase', 'titlecase', 'sentencecase', 'reverse', 'capitalize',
-  'truncate', 'removemultiple', 'removespecial', 'extractemails', 'extracturls',
-  'extractnumbers', 'countwords', 'countchars', 'palindromecheck', 'leet',
-  'morsecode', 'base64encode', 'base64decode', 'urlencode', 'urldecode',
-  'htmlencode',
+  'sentencecase', 'titlecase', 'reverse', 'countwords', 'removemultiple',
+  'removespecial', 'extractemails', 'extracturls', 'extractnumbers', 'truncate',
+  'leet', 'morse', 'base64encode', 'base64decode', 'hash', 'random',
+  'palindromecheck', 'htmlencode', 'htmldecode', 'markdownplain',
+  'unicodenormalize', 'trimtext',
 ];
 
-const codeExample = `curl -X GET "https://textforge.co/v1/run?input=Hello%20World&operations=slugify,reverse"`;
+const codeExample = `curl -X GET "https://textforge.co/transform?text=Hello%20World!&action=slugify"`;
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('curl');
-
-  const codeSnippets = {
-    curl: codeExample,
-    python: `import requests
-
-response = requests.get(
-    "https://textforge.co/v1/run",
-    params={"input": "Hello World", "operations": "slugify,reverse"}
-)
-print(response.json())`,
-    javascript: `const response = await fetch(
-  "https://textforge.co/v1/run?input=Hello%20World&operations=slugify,reverse"
-);
-const data = await response.json();
-console.log(data);`
-  };
-
   return (
-    <div className="min-h-screen bg-white">
-      <Navbar />
-      
+    <div className="flex flex-col">
       {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32">
+      <section className="relative overflow-hidden bg-gradient-to-b from-white to-gray-50">
+        <div className="absolute inset-0 bg-grid-gray-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))]" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
           <div className="text-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 text-sm text-gray-700 mb-6">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              API Online · All Systems Operational
+            <div className="inline-flex items-center px-4 py-2 rounded-full bg-primary-50 text-primary-700 text-sm font-medium mb-8">
+              <span className="flex h-2 w-2 rounded-full bg-primary-600 mr-2"></span>
+              Now with 28 text transformations
             </div>
-            
-            <h1 className="text-5xl sm:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-              The Swiss Army Knife for<br />
-              <span className="text-blue-600">Text Transformations</span>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 mb-6">
+              The Swiss Army Knife for{' '}
+              <span className="text-primary-600">Text Transformations</span>
             </h1>
-            
-            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              28 transformation utilities through a single, simple endpoint.
-              Slugify, camelcase, morse code, and more. No authentication required.
+            <p className="text-xl text-gray-600 mb-10 max-w-3xl mx-auto">
+              28 text utilities through a single, simple endpoint. Slugify, camelcase, morse code, base64, and more. No libraries required.
             </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href="/docs"
-                className="inline-flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-              >
-                <BookOpen className="w-5 h-5" />
-                Read the Docs
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+              <Link href="/docs" className="btn-primary">
+                Read the Docs <ArrowRight className="ml-2 w-4 h-4" />
               </Link>
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center gap-2 px-8 py-3 bg-gray-100 text-gray-900 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-              >
-                <Users className="w-5 h-5" />
+              <Link href="/dashboard" className="btn-secondary">
                 Get API Key
               </Link>
             </div>
           </div>
-
-          {/* Code Example */}
-          <div className="mt-16 max-w-4xl mx-auto">
-            <div className="bg-gray-950 rounded-xl overflow-hidden shadow-2xl">
-              <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-800">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                </div>
-                <span className="text-sm text-gray-400 font-mono">API Request</span>
+          <div className="max-w-2xl mx-auto">
+            <div className="code-block">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
               </div>
-              <div className="flex">
-                <div className="flex flex-col gap-1 p-2 bg-gray-900 border-r border-gray-800">
-                  {['curl', 'python', 'javascript'].map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={`px-3 py-1.5 text-xs font-mono rounded transition-colors ${
-                        activeTab === tab 
-                          ? 'bg-gray-700 text-white' 
-                          : 'text-gray-400 hover:text-gray-300'
-                      }`}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex-1 p-4 overflow-x-auto">
-                  <pre className="text-sm text-green-400 font-mono">
-                    <code>{codeSnippets[activeTab]}</code>
-                  </pre>
-                </div>
-              </div>
+              <pre className="text-gray-300 text-sm overflow-x-auto"><code>{codeExample}</code></pre>
             </div>
           </div>
         </div>
       </section>
-
-      {/* Features Grid */}
-      <section className="py-20 bg-gray-50">
+      <InteractiveDemo />
+      <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">Everything You Need</h2>
-            <p className="text-lg text-gray-600">Built for developers, by developers</p>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              From URL slugs to Morse code, TextForge has you covered with fast, reliable text transformations.
+            </p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[
-              { icon: <Layers className="w-6 h-6" />, title: '28 Transformations', description: 'From slugify to morse code, all text transformations in one API.', color: 'blue' },
-              { icon: <Code2 className="w-6 h-6" />, title: 'Pipeline Chaining', description: 'Combine multiple transformations in a single request.', color: 'green' },
-              { icon: <Zap className="w-6 h-6" />, title: 'Lightning Fast', description: 'Sub-5ms response times. Optimized for performance.', color: 'yellow' },
-              { icon: <Shield className="w-6 h-6" />, title: 'Rate Limiting', description: 'Built-in rate limiting with generous free tier (1K req/day).', color: 'red' },
-              { icon: <Settings2 className="w-6 h-6" />, title: 'Batch Processing', description: 'Process multiple texts in a single request. Up to 100 items.', color: 'purple' },
-              { icon: <Globe className="w-6 h-6" />, title: 'Webhook Delivery', description: 'Async result delivery via webhooks. Fire-and-forget processing.', color: 'orange' },
-            ].map((feature, i) => (
-              <div key={i} className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                <div className={`w-12 h-12 rounded-lg bg-${feature.color}-100 flex items-center justify-center text-${feature.color}-600 mb-4`}>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {features.map((feature, index) => (
+              <div key={index} className="card hover:shadow-md transition-shadow">
+                <div className="w-12 h-12 rounded-lg bg-primary-100 text-primary-600 flex items-center justify-center mb-4">
                   {feature.icon}
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">{feature.title}</h3>
@@ -146,39 +111,30 @@ console.log(data);`
           </div>
         </div>
       </section>
-
-      {/* Transformations List */}
-      <section className="py-20">
+      <section className="py-24 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
+          <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">28 Transformations</h2>
-            <p className="text-lg text-gray-600">All operations available on every transformation</p>
+            <p className="text-xl text-gray-600">All available in a single API call</p>
           </div>
-
-          <div className="flex flex-wrap gap-3 justify-center">
-            {transformations.map((transformation) => (
-              <div
-                key={transformation}
-                className="px-4 py-2 bg-gray-100 rounded-lg font-mono text-sm text-gray-700 hover:bg-gray-200 transition-colors"
-              >
-                {transformation}
-              </div>
+          <div className="flex flex-wrap justify-center gap-3">
+            {transformations.map((transform) => (
+              <span key={transform} className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-mono text-gray-700">
+                {transform}
+              </span>
             ))}
           </div>
         </div>
       </section>
-
-      {/* Pricing Teaser */}
-      <section className="py-20 bg-gradient-to-br from-blue-600 to-blue-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <Pricing />
+      <section className="py-24 bg-primary-600">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">Ready to get started?</h2>
-          <p className="text-xl text-blue-100 mb-8">1,000 requests/day free. No credit card required.</p>
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-2 px-8 py-3 bg-white text-blue-600 rounded-lg hover:bg-blue-50 transition-colors font-medium"
-          >
-            Get Your Free API Key
-            <ArrowRight className="w-5 h-5" />
+          <p className="text-xl text-primary-100 mb-8">
+            Start with our generous free tier. No credit card required.
+          </p>
+          <Link href="/dashboard" className="btn-secondary">
+            Get Your Free API Key <ArrowRight className="ml-2 w-4 h-4" />
           </Link>
         </div>
       </section>
