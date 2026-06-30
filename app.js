@@ -352,8 +352,9 @@ async function logRequest(req, { action, actions, text }, statusCode, latencyMs,
     let apiKeyHash = null;
     
     // Hash IP for privacy (used for anonymous users)
+    // Use full SHA-256 hash (not truncated) to match analytics queries
     const ip = req.ip || req.connection?.remoteAddress || 'unknown';
-    const ipHash = crypto.createHash('sha256').update(ip).digest('hex').substring(0, 16);
+    const ipHash = crypto.createHash('sha256').update(ip).digest('hex');
     
     if (apiKey) {
       const { hashApiKey } = require('./apiKeys');
@@ -541,7 +542,10 @@ app.get('/', (req, res) => {
       <a href="/docs" class="btn-primary">Read the Docs &rarr;</a>
       <a href="/playground" class="btn-secondary">Try Playground</a>
     </div>
-    <div class="code-block">curl -X POST https://textforge.co/v1/run -H "Content-Type: application/json" -d '{"input": "Hello World!", "pipeline": ["slugify", "reverse", "base64encode"]}'</div>
+    <div class="code-block"><pre style="margin:0;white-space:pre-wrap;word-break:break-word;">curl -X POST "https://textforge.co/v1/run" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"input\": \"Hello World!\", \"pipeline\": [\"slugify\", \"reverse\", \"base64encode\"]}"</pre>
+<p style="font-size:12px;color:#888;margin-top:12px;">PowerShell/CMD syntax. For bash, use: <code style="background:#2a2a4e;padding:2px 6px;border-radius:3px;">curl -X POST https://textforge.co/v1/run -H "Content-Type: application/json" -d '{"input": "Hello World!", "pipeline": ["slugify", "reverse", "base64encode"]}'</code></p></div>
   </section>
 
   <section class="section">
