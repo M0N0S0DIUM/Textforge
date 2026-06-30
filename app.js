@@ -347,13 +347,14 @@ const crypto = require('crypto');
  */
 async function logRequest(req, { action, actions, text }, statusCode, latencyMs, requestSize, responseSize) {
   try {
+    const { getClientIP } = require('./rateLimiter');
     // Get API key hash from header
     const apiKey = req.headers['x-api-key'];
     let apiKeyHash = null;
     
     // Hash IP for privacy (used for anonymous users)
-    // Use full SHA-256 hash (not truncated) to match analytics queries
-    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    // Use getClientIP (same as analytics) and full SHA-256 hash to match analytics queries
+    const ip = getClientIP(req);
     const ipHash = crypto.createHash('sha256').update(ip).digest('hex');
     
     if (apiKey) {
