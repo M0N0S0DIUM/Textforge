@@ -1,4 +1,3 @@
-// Force rebuild: 2026-06-24
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -32,13 +31,12 @@ export default function Dashboard() {
   // Show note for free tier users
   const [showFreeTierNote, setShowFreeTierNote] = useState(false);
 
-  // Fetch stats from API (per-user analytics)
+  // Fetch stats from API (per-user analytics) — ALWAYS runs, even without apiKey
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/analytics/usage`, {
-          headers: { 'X-API-Key': apiKey }
-        });
+        const headers = apiKey ? { 'X-API-Key': apiKey } : {};
+        const response = await fetch(`${API_URL}/api/analytics/usage`, { headers });
         const data = await response.json();
         if (data.success) {
           setStats(data.usage);
@@ -48,9 +46,10 @@ export default function Dashboard() {
       }
     };
 
-    if (apiKey) {
-      fetchStats();
-    }
+    fetchStats();
+    // Refetch every 30 seconds for live updates
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
   }, [apiKey]);
 
   // Fetch API keys
@@ -99,13 +98,12 @@ export default function Dashboard() {
       if (data.success && data.key) {
         setApiKey(data.key.key);
         setKeys([data.key]);
-        // Update localStorage with new key
         const stored = localStorage.getItem('textforge_customer');
         if (stored) {
           try {
-            const data = JSON.parse(stored);
-            data.apiKey = data.key.key;
-            localStorage.setItem('textforge_customer', JSON.stringify(data));
+            const d = JSON.parse(stored);
+            d.apiKey = data.key.key;
+            localStorage.setItem('textforge_customer', JSON.stringify(d));
           } catch (err) {
             console.error('Failed to update localStorage:', err);
           }
@@ -143,7 +141,6 @@ export default function Dashboard() {
   const requestsToday = stats?.today?.requests_today || 0;
   const usagePercent = Math.min((requestsToday / dailyLimit) * 100, 100);
 
-  // Helper to show curl commands for checking stats
   const getStatsCommands = () => {
     if (!apiKey) return null;
     const isPro = plan === 'Pro';
@@ -192,14 +189,7 @@ export default function Dashboard() {
         </div>
         <div className="card">
           <div className="text-sm text-gray-500 mb-1">Requests Today</div>
-          <div className="text-2xl font-bold text-gray-900">{stats?.today?.requests_today?.toLocaleString() || '0'}</div>
-          {apiKey && (
-            <div className="mt-2 text-xs text-gray-500 font-mono bg-gray-50 p-2 rounded">
-              {getStatsCommands()?.isPro 
-                ? getStatsCommands()?.pro 
-                : getStatsCommands()?.free}
-            </div>
-          )}
+          <div className="text-2xl font-bold text-gray-900">{requestsToday.toLocaleString()}</div>
         </div>
         <div className="card">
           <div className="text-sm text-gray-500 mb-1">Plan</div>
@@ -212,7 +202,7 @@ export default function Dashboard() {
       <div className="card mb-8">
         <div className="flex justify-between mb-2">
           <span className="text-sm text-gray-600">Daily Usage</span>
-          <span className="text-sm text-gray-600">{stats?.today?.requests_today?.toLocaleString() || '0'} / {dailyLimit.toLocaleString()}</span>
+          <span className="text-sm text-gray-600">{requestsToday.toLocaleString()} / {dailyLimit.toLocaleString()}</span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
           <div
@@ -227,17 +217,11 @@ export default function Dashboard() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">API Key Management</h2>
         {apiKey ? (
           <div className="flex gap-4">
-            <button
-              onClick={handleRegenerate}
-              className="btn-secondary"
-            >
+            <button onClick={handleRegenerate} className="btn-secondary">
               <RefreshCw className="w-4 h-4 mr-2" />
               Regenerate Key
             </button>
-            <button 
-              onClick={handleRevoke}
-              className="btn-secondary text-red-600 border-red-200 hover:bg-red-50"
-            >
+            <button onClick={handleRevoke} className="btn-secondary text-red-600 border-red-200 hover:bg-red-50">
               <Trash2 className="w-4 h-4 mr-2" />
               Revoke Key
             </button>
@@ -252,20 +236,15 @@ export default function Dashboard() {
         <div className="card">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">API Documentation</h3>
           <p className="text-gray-600 mb-4">Explore all available transformations and endpoints.</p>
-          <a href="/docs" className="text-primary-600 hover:text-primary-700 font-medium">
-            View Docs →
-          </a>
+          <a href="/docs" className="text-primary-600 hover:text-primary-700 font-medium">View Docs →</a>
         </div>
         <div className="card">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Upgrade Plan</h3>
           <p className="text-gray-600 mb-4">Get more requests, webhooks, and priority support.</p>
-          <a href="/billing" className="text-primary-600 hover:text-primary-700 font-medium">
-            Upgrade Now →
-          </a>
+          <a href="/billing" className="text-primary-600 hover:text-primary-700 font-medium">Upgrade Now →</a>
         </div>
       </div>
 
-      {/* Manual Stats Check (Analytics API may have delays) */}
       {apiKey && (
         <div className="card mt-8">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Check Usage via CLI</h3>
@@ -280,9 +259,7 @@ export default function Dashboard() {
               <pre className="mt-1 text-xs bg-gray-100 p-3 rounded overflow-x-auto">{getStatsCommands()?.pro}</pre>
             </div>
           </div>
-          <p className="mt-3 text-xs text-gray-500">
-            Note: Dashboard stats may be delayed. Use the commands above for real-time data.
-          </p>
+          <p className="mt-3 text-xs text-gray-500">Note: Dashboard stats may be delayed. Use the commands above for real-time data.</p>
         </div>
       )}
     </div>
