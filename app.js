@@ -554,7 +554,7 @@ app.get('/', (req, res) => {
     <div class="features">
       <div class="feature-card">
         <div class="feature-icon">⚡</div>
-        <h3>23 Transformations</h3>
+        <h3>28 Transformations</h3>
         <p>From slugify to morse code, all text transformations in one API.</p>
       </div>
       <div class="feature-card">
@@ -617,10 +617,10 @@ app.get('/', (req, res) => {
   </section>
 
   <section class="section">
-    <h2 class="section-title">23 Transformations</h2>
+    <h2 class="section-title">28 Transformations</h2>
     <p class="section-subtitle">All available in a single API call</p>
     <div class="transforms-cloud">
-      <span class="transform-tag">slugify</span><span class="transform-tag">camelcase</span><span class="transform-tag">snakecase</span><span class="transform-tag">kebabcase</span><span class="transform-tag">pascalcase</span><span class="transform-tag">constantcase</span><span class="transform-tag">sentencecase</span><span class="transform-tag">titlecase</span><span class="transform-tag">reverse</span><span class="transform-tag">countwords</span><span class="transform-tag">removemultiple</span><span class="transform-tag">removespecial</span><span class="transform-tag">extractemails</span><span class="transform-tag">extracturls</span><span class="transform-tag">extractnumbers</span><span class="transform-tag">truncate</span><span class="transform-tag">leet</span><span class="transform-tag">morse</span><span class="transform-tag">base64encode</span><span class="transform-tag">base64decode</span><span class="transform-tag">hash</span><span class="transform-tag">random</span><span class="transform-tag">palindromecheck</span>
+      <span class="transform-tag">slugify</span><span class="transform-tag">camelcase</span><span class="transform-tag">snakecase</span><span class="transform-tag">kebabcase</span><span class="transform-tag">pascalcase</span><span class="transform-tag">constantcase</span><span class="transform-tag">sentencecase</span><span class="transform-tag">titlecase</span><span class="transform-tag">reverse</span><span class="transform-tag">countwords</span><span class="transform-tag">removemultiple</span><span class="transform-tag">removespecial</span><span class="transform-tag">extractemails</span><span class="transform-tag">extracturls</span><span class="transform-tag">extractnumbers</span><span class="transform-tag">truncate</span><span class="transform-tag">leet</span><span class="transform-tag">morse</span><span class="transform-tag">base64encode</span><span class="transform-tag">base64decode</span><span class="transform-tag">hash</span><span class="transform-tag">random</span><span class="transform-tag">palindromecheck</span><span class="transform-tag">htmlencode</span><span class="transform-tag">htmldecode</span><span class="transform-tag">markdownplain</span><span class="transform-tag">unicodenormalize</span><span class="transform-tag">trimtext</span>
     </div>
   </section>
 
@@ -634,7 +634,7 @@ app.get('/', (req, res) => {
         <p style="color: #888; font-size: 14px; margin-top: 8px;">Perfect for testing and small projects</p>
         <ul>
           <li>✓ 1,000 requests/day</li>
-          <li>✓ All 23 transformations</li>
+          <li>✓ All 28 transformations</li>
           <li>✓ Chaining support</li>
           <li>✓ Community support</li>
         </ul>
