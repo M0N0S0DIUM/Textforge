@@ -1,6 +1,4 @@
-import { Metadata } from 'next';
-
-export const metadata: Metadata = {
+export const metadata = {
   title: 'API Documentation - TextForge | 28 Text Transformations',
   description: 'Complete API documentation for TextForge text transformation API. Learn how to use all 28 transformation operations including slugify, camelcase, base64, morse code, and more.',
   keywords: 'API documentation, text transformation API, slugify, camelcase, base64, morse code, TextForge',
@@ -18,10 +16,6 @@ export const metadata: Metadata = {
   },
 };
 
-export default function DocsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DocsLayout({ children }) {
   return children;
 }

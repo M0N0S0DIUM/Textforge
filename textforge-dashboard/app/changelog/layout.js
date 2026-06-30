@@ -1,6 +1,4 @@
-import { Metadata } from 'next';
-
-export const metadata: Metadata = {
+export const metadata = {
   title: 'Changelog - TextForge | Text Transformation API Updates',
   description: 'TextForge changelog and release notes. Track updates to the text transformation API including new features, improvements, and bug fixes for all 28 transformation operations.',
   keywords: 'changelog, release notes, TextForge updates, API changes, text transformation updates',
@@ -18,10 +16,6 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ChangelogLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function ChangelogLayout({ children }) {
   return children;
 }

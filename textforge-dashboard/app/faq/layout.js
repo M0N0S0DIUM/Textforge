@@ -1,6 +1,4 @@
-import { Metadata } from 'next';
-
-export const metadata: Metadata = {
+export const metadata = {
   title: 'FAQ - TextForge | Text Transformation API',
   description: 'Frequently asked questions about TextForge text transformation API. Learn about pricing, rate limits, API usage, and all 28 transformation operations.',
   keywords: 'FAQ, text transformation FAQ, TextForge help, API pricing, rate limits',
@@ -18,10 +16,6 @@ export const metadata: Metadata = {
   },
 };
 
-export default function FAQLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function FAQLayout({ children }) {
   return children;
 }
