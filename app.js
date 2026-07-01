@@ -1057,28 +1057,38 @@ app.get('/playground', (req, res) => {
       const startTime = Date.now();
       
       try {
-        const response = await fetch('/transform', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, action: transformation })
-        });
+              const response = await fetch('/transform', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, action: transformation })
+              });
 
-        if (!response.ok) throw new Error('Transform failed');
+              if (!response.ok) throw new Error('Transform failed');
         
-        const data = await response.json();
-        const executionTime = Date.now() - startTime;
+              const data = await response.json();
+              const executionTime = Date.now() - startTime;
         
-        document.getElementById('singleResult').innerHTML = '<div class="result-row">' +
-          '<div class="result-title">Result (' + escapeHtml(transformation) + ')</div>' +
-          '<div class="result-value">' + escapeHtml(String(data.result)) + '</div>' +
-          '</div>' +
-          '<div class="execution-time">Execution time: ' + executionTime + 'ms</div>';
-      } catch (error) {
-        document.getElementById('singleResult').innerHTML = '<div class="result-row">' +
-          '<div class="result-title error">Error</div>' +
-          '<div class="result-value error">' + escapeHtml(error.message) + '</div>' +
-          '</div>';
-      }
+              // Format result nicely (handle objects from countwords, palindromecheck)
+              let displayResult;
+              if (data.result === null || data.result === undefined) {
+                displayResult = 'null';
+              } else if (typeof data.result === 'object') {
+                displayResult = JSON.stringify(data.result, null, 2);
+              } else {
+                displayResult = String(data.result);
+              }
+        
+              document.getElementById('singleResult').innerHTML = '<div class="result-row">' +
+                '<div class="result-title">Result (' + escapeHtml(transformation) + ')</div>' +
+                '<div class="result-value">' + escapeHtml(displayResult) + '</div>' +
+                '</div>' +
+                '<div class="execution-time">Execution time: ' + executionTime + 'ms</div>';
+            } catch (error) {
+              document.getElementById('singleResult').innerHTML = '<div class="result-row">' +
+                '<div class="result-title error">Error</div>' +
+                '<div class="result-value error">' + escapeHtml(error.message) + '</div>' +
+                '</div>';
+            }
     }
 
     function toggleShowAll() {
@@ -1108,12 +1118,14 @@ app.get('/playground', (req, res) => {
           } catch (error) {
             return { transformation: trans, result: null };
           }
-        })).then(results => {
-          listContainer.innerHTML = results.map(r => '<div class="result-row">' +
-            '<div class="result-title">' + r.transformation + '</div>' +
-            '<div class="result-value">' + (r.result ? escapeHtml(String(r.result)) : 'Error') + '</div>' +
-            '</div>').join('');
-        });
+        }).then(results => {
+                  listContainer.innerHTML = results.map(r => '<div class="result-row">' +
+                    '<div class="result-title">' + escapeHtml(r.transformation) + '</div>' +
+                    '<div class="result-value">' + (r.result !== null && r.result !== undefined ?
+                      (typeof r.result === 'object' ? escapeHtml(JSON.stringify(r.result, null, 2)) : escapeHtml(String(r.result)))
+                      : 'Error') + '</div>' +
+                    '</div>').join('');
+                });
       } else {
         listContainer.innerHTML = '';
       }
