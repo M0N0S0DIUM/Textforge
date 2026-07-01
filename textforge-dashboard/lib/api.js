@@ -62,20 +62,29 @@ export async function fetchStats(baseUrl = DEFAULT_BASE_URL) {
  * Retrieve all API keys visible to the current session.
  *
  * @param {string} [baseUrl]
+ * @param {string} [customerId]  — Stripe customer ID for Pro customers
  * @returns {Promise<{ success: boolean, keys?: object[], error?: string }>}
  */
-export async function fetchKeys(baseUrl = DEFAULT_BASE_URL) {
-  return apiFetch(`${baseUrl}/api/keys`);
+export async function fetchKeys(baseUrl = DEFAULT_BASE_URL, customerId = null) {
+  const url = customerId ? `${baseUrl}/api/keys?customerId=${encodeURIComponent(customerId)}` : `${baseUrl}/api/keys`;
+  return apiFetch(url);
 }
 
 /**
  * Generate a new API key.
  *
  * @param {string} [baseUrl]
+ * @param {string} [customerId]  — Stripe customer ID for Pro customers
  * @returns {Promise<{ success: boolean, key?: object, error?: string }>}
  */
-export async function generateKey(baseUrl = DEFAULT_BASE_URL) {
-  return apiFetch(`${baseUrl}/api/keys`, { method: 'POST' });
+export async function generateKey(baseUrl = DEFAULT_BASE_URL, customerId = null) {
+  const headers = {};
+  const body = {};
+  if (customerId) {
+    headers['X-Customer-Id'] = customerId;
+    body.customerId = customerId;
+  }
+  return apiFetch(`${baseUrl}/api/keys`, { method: 'POST', headers, body: JSON.stringify(body) });
 }
 
 /**
@@ -83,10 +92,13 @@ export async function generateKey(baseUrl = DEFAULT_BASE_URL) {
  *
  * @param {number|string} keyId
  * @param {string} [baseUrl]
+ * @param {string} [customerId]  — Stripe customer ID for Pro customers
  * @returns {Promise<{ success: boolean, error?: string }>}
  */
-export async function revokeKey(keyId, baseUrl = DEFAULT_BASE_URL) {
-  return apiFetch(`${baseUrl}/api/keys/${encodeURIComponent(keyId)}`, { method: 'DELETE' });
+export async function revokeKey(keyId, baseUrl = DEFAULT_BASE_URL, customerId = null) {
+  const headers = {};
+  if (customerId) headers['X-Customer-Id'] = customerId;
+  return apiFetch(`${baseUrl}/api/keys/${encodeURIComponent(keyId)}`, { method: 'DELETE', headers });
 }
 
 // ---------------------------------------------------------------------------

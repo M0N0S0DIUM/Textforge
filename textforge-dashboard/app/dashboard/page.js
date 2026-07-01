@@ -52,11 +52,23 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [apiKey]);
 
-  // Fetch API keys
+  // Fetch API keys (requires customerId for Pro customers)
   useEffect(() => {
+    const stored = localStorage.getItem('textforge_customer');
+    let customerId = null;
+    if (stored) {
+      try {
+        const data = JSON.parse(stored);
+        customerId = data.customerId;
+      } catch (err) {
+        console.error('Failed to parse customer data:', err);
+      }
+    }
+
     const fetchKeys = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/keys`);
+        const url = customerId ? `${API_URL}/api/keys?customerId=${encodeURIComponent(customerId)}` : `${API_URL}/api/keys`;
+        const response = await fetch(url);
         const data = await response.json();
         if (data.success) {
           setKeys(data.keys);
@@ -86,13 +98,25 @@ export default function Dashboard() {
       return;
     }
 
+    const stored = localStorage.getItem('textforge_customer');
+    let customerId = null;
+    if (stored) {
+      try {
+        const data = JSON.parse(stored);
+        customerId = data.customerId;
+      } catch (err) {
+        console.error('Failed to parse customer data:', err);
+      }
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/keys`, { 
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-API-Key': apiKey 
-        }
+          ...(customerId && { 'X-Customer-Id': customerId })
+        },
+        body: JSON.stringify(customerId ? { customerId } : {})
       });
       const data = await response.json();
       if (data.success && data.key) {
@@ -121,11 +145,24 @@ export default function Dashboard() {
       return;
     }
 
+    const stored = localStorage.getItem('textforge_customer');
+    let customerId = null;
+    if (stored) {
+      try {
+        const data = JSON.parse(stored);
+        customerId = data.customerId;
+      } catch (err) {
+        console.error('Failed to parse customer data:', err);
+      }
+    }
+
     try {
       if (keys.length > 0 && keys[0].id) {
+        const headers = { 'X-API-Key': apiKey };
+        if (customerId) headers['X-Customer-Id'] = customerId;
         await fetch(`${API_URL}/api/keys/${keys[0].id}`, { 
           method: 'DELETE',
-          headers: { 'X-API-Key': apiKey }
+          headers
         });
       }
       setApiKey('');

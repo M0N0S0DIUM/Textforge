@@ -23,53 +23,131 @@ const keyManagementLimiter = rateLimit({
   message: { error: 'Too many requests to key management endpoint, please try again later.' },
 });
 
+/**
+ * Validate that a customer has an active Pro subscription.
+ * Returns { customer, tier } or throws an error response.
+ * Accepts customerId from either query param (GET) or body/header (POST/DELETE).
+ */
+async function validateProCustomer(req, res) {
+  // Prefer explicit customerId from query/body/header; fall back to X-API-Key lookup if needed
+  const customerId = req.query.customerId || req.body?.customerId || req.headers['x-customer-id'];
+  
+  if (!customerId) {
+    res.status(401).json({ error: 'customerId required (query, body, or X-Customer-Id header)' });
+    return null;
+  }
+
+  // First check local DB for a customer with active Pro subscription
+  let customer = await db.get('SELECT * FROM customers WHERE stripe_customer_id = $1', [customerId]);
+
+  if (customer) {
+    // Verify subscription is active and tier is pro
+    if (customer.tier === 'pro' && customer.subscription_status === 'active') {
+      return { customer, tier: 'pro' };
+    }
+    // Local DB says not pro/active — could be stale, verify with Stripe
+  }
+
+  // Fallback: fetch live from Stripe (mirrors /api/billing/status logic)
+  try {
+    const stripeCustomer = await stripe.customers.retrieve(customerId);
+    if (stripeCustomer.deleted) {
+      res.status(404).json({ error: 'Customer not found' });
+      return null;
+    }
+
+    let subscription = null;
+    let tier = 'free';
+    let subscriptionStatus = 'inactive';
+
+    if (stripeCustomer.subscriptions?.data?.length > 0) {
+      subscription = stripeCustomer.subscriptions.data[0];
+      tier = subscription.metadata?.tier || 'pro';
+      subscriptionStatus = subscription.status;
+    }
+
+    if (tier === 'pro' && subscriptionStatus === 'active') {
+      // Sync local DB if needed
+      if (!customer) {
+        await db.query(
+          'INSERT INTO customers (stripe_customer_id, email, tier, subscription_id, subscription_status) VALUES ($1, $2, $3, $4, $5)',
+          [stripeCustomer.id, stripeCustomer.email, tier, subscription?.id, subscriptionStatus]
+        );
+      }
+      return { customer: { ...customer, stripe_customer_id: customerId, tier: 'pro' }, tier: 'pro' };
+    }
+
+    res.status(403).json({ error: 'Active Pro subscription required' });
+    return null;
+  } catch (stripeErr) {
+    logger.warn('Stripe customer lookup failed', { customerId, error: stripeErr.message });
+    res.status(404).json({ error: 'Customer not found' });
+    return null;
+  }
+}
+
 // ──────────────────────────────────────────────
-// API Keys
+// API Keys (require active Pro subscription)
 // ──────────────────────────────────────────────
 
-// GET /api/keys  — list all API keys
+// GET /api/keys?customerId=cus_xxx  — list API keys for a Pro customer
 router.get('/keys', keyManagementLimiter, async (req, res) => {
+  const validation = await validateProCustomer(req, res);
+  if (!validation) return;
+  const { customer } = validation;
+
   try {
-    const keys = await db.query('SELECT id, key, tier, customer_id, created_at FROM api_keys ORDER BY created_at DESC');
+    const keys = await db.query(
+      'SELECT id, key, tier, customer_id, created_at FROM api_keys WHERE customer_id = $1 ORDER BY created_at DESC',
+      [customer.stripe_customer_id]
+    );
     res.json({ success: true, keys: keys.rows });
   } catch (error) {
-    logger.error('Error fetching API keys', { error: error.message });
+    logger.error('Error fetching API keys', { error: error.message, customerId: customer.stripe_customer_id });
     res.status(500).json({ error: 'Failed to fetch API keys' });
   }
 });
 
-// POST /api/keys  — create a new API key (server-side secure generation)
+// POST /api/keys  — create a new API key for a Pro customer
 router.post('/keys', keyManagementLimiter, async (req, res) => {
+  const validation = await validateProCustomer(req, res);
+  if (!validation) return;
+  const { customer, tier } = validation;
+
   try {
-    const { customer_id, tier = 'pro' } = req.body || {};
     const apiKey = generateApiKey();
     const apiKeyHash = hashApiKey(apiKey);
 
     const result = await db.query(
       'INSERT INTO api_keys (key, key_hash, customer_id, tier) VALUES ($1, $2, $3, $4) RETURNING id, key, tier, customer_id, created_at',
-      [apiKey, apiKeyHash, customer_id || null, tier]
+      [apiKey, apiKeyHash, customer.stripe_customer_id, tier]
     );
 
-    logger.info('API key created', { id: result.rows[0].id, tier });
+    logger.info('API key created', { id: result.rows[0].id, customerId: customer.stripe_customer_id, tier });
     res.status(201).json({ success: true, key: result.rows[0] });
   } catch (error) {
-    logger.error('Error creating API key', { error: error.message });
+    logger.error('Error creating API key', { error: error.message, customerId: customer.stripe_customer_id });
     res.status(500).json({ error: 'Failed to create API key' });
   }
 });
 
-// DELETE /api/keys/:id  — revoke an API key by id
+// DELETE /api/keys/:id  — revoke an API key by id (only if owned by the Pro customer)
 router.delete('/keys/:id', keyManagementLimiter, async (req, res) => {
+  const validation = await validateProCustomer(req, res);
+  if (!validation) return;
+  const { customer } = validation;
+
   try {
     const { id } = req.params;
-    const result = await db.query('DELETE FROM api_keys WHERE id = $1', [id]);
+    // Only allow deleting keys owned by this customer
+    const result = await db.query('DELETE FROM api_keys WHERE id = $1 AND customer_id = $2', [id, customer.stripe_customer_id]);
     if (result.rowCount === 0) {
       return res.status(404).json({ error: 'API key not found' });
     }
-    logger.info('API key revoked', { id });
+    logger.info('API key revoked', { id, customerId: customer.stripe_customer_id });
     res.json({ success: true });
   } catch (error) {
-    logger.error('Error revoking API key', { error: error.message });
+    logger.error('Error revoking API key', { error: error.message, customerId: customer.stripe_customer_id });
     res.status(500).json({ error: 'Failed to revoke API key' });
   }
 });
